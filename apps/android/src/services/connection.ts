@@ -8,7 +8,7 @@ import { SecureTransport } from './secure-transport'
 import { BotRemoteClient } from './bot-catalog'
 
 export type MuxFrameHandler = (frame: MuxStreamFrame) => void
-export type CloseHandler = (options?: { retryable: boolean }) => void
+export type CloseHandler = (options?: { retryable: boolean; lastTransport?: 'lan' | 'p2p' | 'turn' | 'relay' }) => void
 type RemoteHarnessClient = HarnessAlphaClient
 
 export interface AndroidConnectionOptions {
@@ -18,6 +18,7 @@ export interface AndroidConnectionOptions {
   refreshAccessToken?: () => Promise<string>
   fetchIceServers?: (connectionId: string) => Promise<RtcIceServer[]>
   onSecureHandshake?: () => void
+  onWebRtcFallback?: () => void
   onClose?: CloseHandler
 }
 
@@ -39,6 +40,8 @@ export class AndroidRemoteConnection {
   private connectionAttempt = 0
   private healthTimer?: ReturnType<typeof setTimeout>
   private healthFlight?: { core: RemoteClientCore; result: Promise<boolean> }
+  /** Consecutive failed health probes for the active core; reset on success. */
+  private healthCheckFailures = 0
 
   async configureHistory(compact: boolean): Promise<void> {
     if (this.core !== undefined && this.compactHistorySupported) {
@@ -63,6 +66,7 @@ export class AndroidRemoteConnection {
     let webRtcFallback = false
     let replacingFallback = false
     let retryableClose = true
+    let lastTransport: 'lan' | 'p2p' | 'turn' | 'relay' | undefined
     const createTransport = (relayOnly: boolean) => new AdaptiveTransport(websocketUrl(baseUrl), {
       role: 'client',
       deviceId: identity.deviceId,
@@ -73,6 +77,10 @@ export class AndroidRemoteConnection {
       preferredTransports: options.forceRelay || relayOnly
         ? ['relay']
         : options.preferredTransports ?? ['lan', 'p2p', 'turn', 'relay'],
+      // Mobile hole punching is fast when it works; never let the server's
+      // fallback hint stretch the wait, and cap the ICE credential fetch.
+      negotiateTimeoutMs: 8_000,
+      iceServersTimeoutMs: 5_000,
       fetchIceServers: options.fetchIceServers,
       onDisconnect: event => {
         // Refused/replaced credentials, protocol errors and malformed frames
@@ -80,10 +88,12 @@ export class AndroidRemoteConnection {
         retryableClose = event.reason !== 'invalid-control-frame'
           && !(event.closeCode !== undefined && (event.closeCode >= 4000
             || [1002, 1003, 1007, 1008, 1009].includes(event.closeCode)))
+        if (event.transport !== undefined) lastTransport = event.transport
         console.warn('[dsh-remote] Carrier closed:', JSON.stringify(event))
       },
       onWebRtcFallback: error => {
         webRtcFallback = true
+        options.onWebRtcFallback?.()
         // Do not include credentials, SDP, prompts, or tunnel payloads.
         console.warn('[dsh-remote] WebRTC fallback:', error.message)
       },
@@ -125,7 +135,7 @@ export class AndroidRemoteConnection {
         this.cursor = undefined
         this.acpBackends.clear()
         this.sessionTools = undefined
-        if (!replacingFallback) options.onClose?.({ retryable: retryableClose })
+        if (!replacingFallback) options.onClose?.({ retryable: retryableClose, ...(lastTransport !== undefined ? { lastTransport } : {}) })
       })
       await core.connect()
       if (attempt !== this.connectionAttempt || this.core !== core) throw new Error('The connection attempt was superseded.')
@@ -363,22 +373,34 @@ export class AndroidRemoteConnection {
     }
   }
 
-  private scheduleHealthCheck(core: RemoteClientCore): void {
+  private scheduleHealthCheck(core: RemoteClientCore, delayMs = 25_000): void {
     this.clearHealthTimer()
     this.healthTimer = setTimeout(() => {
       this.healthTimer = undefined
       if (this.core !== core) return
       void this.checkHealth().then(healthy => {
         if (this.core !== core) return
-        if (healthy) this.scheduleHealthCheck(core)
-        else {
-          console.info('[dsh-remote] Carrier health check failed; closing carrier')
+        if (healthy) {
+          this.healthCheckFailures = 0
+          this.scheduleHealthCheck(core)
+          return
+        }
+        // A single slow probe (congested relay, brief radio gap) must not kill
+        // a carrier that still delivers: every forced close sends the user
+        // through a full reconnect + session history catch-up before live
+        // streaming resumes. Confirm with one fast retry first.
+        this.healthCheckFailures += 1
+        if (this.healthCheckFailures >= 2) {
+          console.info('[dsh-remote] Carrier health check failed repeatedly; closing carrier')
           // close() on the core publishes the same offline/recovery transition
           // as a socket close, including when the OS never delivered onclose.
           void core.close().catch(() => undefined)
+        } else {
+          console.info('[dsh-remote] Carrier health check failed once; re-probing shortly')
+          this.scheduleHealthCheck(core, 5_000)
         }
       })
-    }, 25_000)
+    }, delayMs)
   }
 
   private clearHealthTimer(): void {

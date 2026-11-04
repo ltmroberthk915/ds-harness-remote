@@ -61496,12 +61496,14 @@ var AdaptiveTransport = class extends BaseTransport {
       iceServers = [];
     }
     throwIfAborted(signal);
+    const negotiatedMs = negotiateTimeout(this.serverNegotiateTimeoutMs, this.options.negotiateTimeoutMs);
+    const effectiveNegotiateTimeoutMs = iceServers.length === 0 ? Math.min(negotiatedMs ?? DEFAULT_EMPTY_ICE_NEGOTIATE_TIMEOUT_MS, DEFAULT_EMPTY_ICE_NEGOTIATE_TIMEOUT_MS) : negotiatedMs;
     const rtc = new RtcDataChannelTransport({
       role: "initiator",
       factory,
       iceServers,
       onSignal: (signal2) => this.sendRtcSignal(signal2),
-      negotiateTimeoutMs: negotiateTimeout(this.serverNegotiateTimeoutMs, this.options.negotiateTimeoutMs),
+      negotiateTimeoutMs: effectiveNegotiateTimeoutMs,
       label: `client->${this.options.targetDeviceId}`,
       onDiagnostic: (event) => {
         this.lastRtcDiagnostics = event.diagnostics;
@@ -61520,7 +61522,11 @@ var AdaptiveTransport = class extends BaseTransport {
     });
     rtc.onClose(() => {
       if (this.rtc === rtc && this.dataMode === "webrtc") {
-        this.failConnection(new Error("Active WebRTC channel closed"), { reason: "webrtc-closed" });
+        const transport = this.selected;
+        this.failConnection(new Error("Active WebRTC channel closed"), {
+          reason: "webrtc-closed",
+          ...transport === "lan" || transport === "p2p" || transport === "turn" ? { transport } : {}
+        });
       }
     });
     try {
@@ -61848,12 +61854,15 @@ function socketState(readyState) {
   return "closed";
 }
 function negotiateTimeout(serverMs, localMs) {
-  if (serverMs === void 0)
+  if (localMs !== void 0)
     return localMs;
-  if (localMs === void 0)
-    return serverMs;
-  return Math.max(serverMs, localMs);
+  if (serverMs === void 0)
+    return void 0;
+  return Math.min(SERVER_NEGOTIATE_TIMEOUT_MAX_MS, Math.max(SERVER_NEGOTIATE_TIMEOUT_MIN_MS, serverMs));
 }
+var DEFAULT_EMPTY_ICE_NEGOTIATE_TIMEOUT_MS = 4e3;
+var SERVER_NEGOTIATE_TIMEOUT_MIN_MS = 6e3;
+var SERVER_NEGOTIATE_TIMEOUT_MAX_MS = 12e3;
 function throwIfAborted(signal) {
   if (signal?.aborted)
     throw new Error("Adaptive connection was aborted");
@@ -74753,7 +74762,7 @@ function normalizeServerUrl(value) {
 }
 
 // src/version.ts
-var PLUGIN_VERSION = "0.6.2";
+var PLUGIN_VERSION = "0.6.3-fork.1";
 
 // src/server-api.ts
 var TERMINAL_CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/u;
@@ -87064,6 +87073,11 @@ var HostServerConnection = class {
             }
             acknowledged = true;
             clearTimeout(helloTimer);
+            if (this.rtcFactory === void 0 && this.rtcFactoryProvider !== void 0 && !this.config.forceRelay) {
+              void this.rtcFactoryProvider().then((factory) => {
+                if (factory !== void 0) this.rtcFactory ??= factory;
+              }).catch(() => void 0);
+            }
             for (const tunnel of [...this.tunnels.values()]) {
               const required2 = tunnel.transport === "relay" ? RELAY_RESUME_CAPABILITY : WEBRTC_RESUME_CAPABILITY;
               if (tunnel.lease && !this.negotiatedCapabilities.includes(required2)) await this.dropTunnel(tunnel.connectionId);
@@ -87169,7 +87183,13 @@ var HostServerConnection = class {
       return;
     }
     if (frame.type === "signal.offer") {
-      await this.handleSignalOffer(requireSignal(frame.payload));
+      if (!this.canUseWebRtc()) {
+        throw new ControlConnectionError("INVALID_MESSAGE", "Server forwarded WebRTC signaling without negotiating it.");
+      }
+      void this.handleSignalOffer(requireSignal(frame.payload)).catch((error62) => {
+        if (this.stopped) return;
+        this.logger.warn("webrtc offer handling failed", { reason: diagnosticReason3(asError2(error62)) });
+      });
       return;
     }
     if (frame.type === "signal.ice") {
@@ -87372,9 +87392,6 @@ var HostServerConnection = class {
     }
   }
   async handleSignalOffer(payload) {
-    if (!this.canUseWebRtc()) {
-      throw new ControlConnectionError("INVALID_MESSAGE", "Server forwarded WebRTC signaling without negotiating it.");
-    }
     const tunnel = this.tunnels.get(payload.connectionId);
     if (tunnel === void 0 || payload.targetDeviceId !== this.identity.deviceId) {
       this.logger.warn("stale webrtc offer ignored", { connectionId: shortId3(payload.connectionId) });
@@ -87404,7 +87421,7 @@ var HostServerConnection = class {
         code: errorCode4(error62)
       });
     }
-    if (this.stopped || this.tunnels.get(tunnel.connectionId) !== tunnel || tunnel.rtc !== void 0 || tunnel.channel !== void 0) return;
+    if (this.stopped || this.tunnels.get(tunnel.connectionId) !== tunnel || tunnel.rtc !== void 0 || tunnel.channel !== void 0 || tunnel.transport !== "negotiating") return;
     if (!tunnel.preferredTransports.includes("turn")) iceServers = stunOnlyIceServers(iceServers);
     const rtc = new RtcDataChannelTransport({
       role: "responder",
@@ -87435,6 +87452,11 @@ var HostServerConnection = class {
       void this.handleRtcFailed(tunnel, rtc, asError2(error62));
     });
     rtc.handleSignal({ type: "offer", sdp: payload.sdp });
+    const buffered = tunnel.pendingIce;
+    if (buffered !== void 0) {
+      tunnel.pendingIce = void 0;
+      for (const candidate of buffered) rtc.handleSignal({ type: "ice", candidate });
+    }
   }
   handleSignalIce(payload) {
     if (!this.canUseWebRtc()) {
@@ -87442,7 +87464,12 @@ var HostServerConnection = class {
     }
     const tunnel = this.tunnels.get(payload.connectionId);
     if (tunnel === void 0 || payload.targetDeviceId !== this.identity.deviceId) return;
-    tunnel.rtc?.handleSignal({ type: "ice", candidate: payload.candidate });
+    const rtc = tunnel.rtc;
+    if (rtc !== void 0) {
+      rtc.handleSignal({ type: "ice", candidate: payload.candidate });
+      return;
+    }
+    if (tunnel.channel === void 0) (tunnel.pendingIce ??= []).push(payload.candidate);
   }
   async handleTransportSelected(payload) {
     const tunnel = this.tunnels.get(payload.connectionId);

@@ -7,7 +7,9 @@ interface RecoveryState {
   transportPreference: TransportPreference
 }
 
-const RETRY_DELAYS_MS = [1_000, 3_000, 8_000]
+// First retry is immediate: a dropped P2P path should recover in ~1s over
+// the relay, not after a fixed 1s timer plus the whole connect pipeline.
+const RETRY_DELAYS_MS = [0, 1_000, 3_000, 8_000, 15_000, 30_000, 30_000, 60_000]
 
 /** Recover a previously connected Host while its runtime is retained; never replay a mutation. */
 export class ForegroundConnectionRecovery {
@@ -27,7 +29,15 @@ export class ForegroundConnectionRecovery {
   ) {}
 
   setActive(active: boolean): void {
+    if (this.active === active) return
     this.active = active
+    if (active) {
+      // Returning to the foreground is a fresh chance (new network, better
+      // signal): re-arm even after the previous cycle exhausted itself.
+      this.attempts = 0
+      this.exhausted = false
+      this.cancelTimer()
+    }
     this.update()
   }
 
