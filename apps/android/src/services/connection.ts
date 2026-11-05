@@ -42,11 +42,18 @@ export class AndroidRemoteConnection {
   private healthFlight?: { core: RemoteClientCore; result: Promise<boolean> }
   /** Consecutive failed health probes for the active core; reset on success. */
   private healthCheckFailures = 0
+  /** Compact-history mode already applied to the current core. */
+  private historyConfigured?: boolean
+  /** Capability probe result per Host build; features cannot change without a version bump. */
+  private featuresCache?: { key: string; features: RemoteHostFeatures }
 
   async configureHistory(compact: boolean): Promise<void> {
-    if (this.core !== undefined && this.compactHistorySupported) {
-      await this.core.rpc('remote.history.configure', { compact })
-    }
+    if (this.core === undefined || !this.compactHistorySupported) return
+    // Opening every session used to cost a full RPC round trip even when the
+    // mode had not changed. Only reconfigure when it actually differs.
+    if (this.historyConfigured === compact) return
+    await this.core.rpc('remote.history.configure', { compact })
+    this.historyConfigured = compact
   }
 
   async connect(
@@ -120,6 +127,7 @@ export class AndroidRemoteConnection {
         35_000,
       )
       this.core = core
+      this.historyConfigured = undefined
       this.unsubscribeClose = core.onClose(() => {
         // A late close from a replaced connection must not tear down the new
         // connection that may already be stored on this instance.
@@ -146,7 +154,13 @@ export class AndroidRemoteConnection {
       // second relay-only connection doubled every fallback into two full
       // handshakes and added 10s+ to mobile connections.
       const core = await connectCore(false)
-      const features = await probeRemoteHostFeatures(core, host.clientVersion)
+      // The capability probe is one RPC round trip per connect. Host features
+      // are fixed for a given Host build, so reuse the last result for the
+      // same client/harness version instead of paying it on every reconnect.
+      const featureKey = `${host.clientVersion ?? ''}|${host.harnessVersion ?? ''}`
+      const cachedFeatures = this.featuresCache?.key === featureKey ? this.featuresCache.features : undefined
+      const features = cachedFeatures ?? await probeRemoteHostFeatures(core, host.clientVersion)
+      if (cachedFeatures === undefined) this.featuresCache = { key: featureKey, features }
       if (attempt !== this.connectionAttempt || this.core !== core) throw new Error('The connection attempt was superseded.')
       const emitFrame = (frame: MuxStreamFrame) => {
         if (this.core !== core) return
@@ -408,6 +422,7 @@ export class AndroidRemoteConnection {
 
   private async clearConnection(): Promise<void> {
     this.clearHealthTimer()
+    this.historyConfigured = undefined
     this.muxHandler = undefined
     const mux = this.closeMux
     this.closeMux = undefined
