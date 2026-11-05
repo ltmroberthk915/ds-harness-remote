@@ -237,7 +237,10 @@ export function buildWeriftFactory(werift: WeriftModule, options: WeriftFactoryO
       const raw = new werift.RTCPeerConnection({
         iceServers: orderIceServersForWerift(configuration.iceServers ?? []) as RtcIceServer[],
         iceUseIpv4: true,
-        iceUseIpv6: false,
+        // IPv6 host candidates let a dual-stack client (mobile carriers usually
+        // are) reach this Host without NAT hole punching at all. Disabled by
+        // default historically; callers opt in through the plugin config.
+        iceUseIpv6: options.iceIpv6 === true,
         iceUseLinkLocalAddress: false,
         ...(hostIpv4Candidates.length === 0
           ? {}

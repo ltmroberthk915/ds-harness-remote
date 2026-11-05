@@ -1,5 +1,6 @@
 import { applyLanguagePreference, updateSystemLocales } from '../locales/i18n'
 import {
+  saveCellularSkipP2p,
   saveDefaultPermissionPreset,
   saveCompactHistory,
   saveLanguagePreference,
@@ -11,11 +12,16 @@ import {
 import type { AppState, StoreAccess } from './store-state'
 
 export function createPreferenceActions({ set, get }: StoreAccess): Pick<AppState,
-  'setCompactHistory' | 'setTransportPreference' | 'setLanguagePreference' | 'setThemePreference' | 'setTypographyDensity' | 'setStatusBarVisible' | 'setDefaultPermissionPreset' | 'syncSystemLocales'> {
+  'setCompactHistory' | 'setCellularSkipP2p' | 'setTransportPreference' | 'setLanguagePreference' | 'setThemePreference' | 'setTypographyDensity' | 'setStatusBarVisible' | 'setDefaultPermissionPreset' | 'syncSystemLocales'> {
   return {
     async setCompactHistory(compactHistory) {
       await saveCompactHistory(compactHistory)
       set({ compactHistory })
+    },
+    async setCellularSkipP2p(cellularSkipP2p) {
+      await saveCellularSkipP2p(cellularSkipP2p)
+      // Applies to the next connection; the current carrier stays untouched.
+      set({ cellularSkipP2p })
     },
     async setTransportPreference(preference) {
       await saveTransportPreference(preference)

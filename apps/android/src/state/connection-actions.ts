@@ -82,7 +82,7 @@ export function createConnectionActions({ get, set, runtime }: SessionAccess): P
           ? ['relay'] as const
           : preference === 'turn'
             ? ['turn', 'relay'] as const
-            : await resolveAutomaticPreferredTransports()
+            : await resolveAutomaticPreferredTransports({ skipP2pOnRemote: get().cellularSkipP2p })
         if (generation !== runtime.connectionGeneration) return false
         set({ connectionStage: 'transport', connectionProbeOrder: initialProbeTransports(preferredTransports) })
         const transportStartedAt = Date.now()

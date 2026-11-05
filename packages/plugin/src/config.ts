@@ -72,6 +72,8 @@ export interface ResolvedConfig {
   serverUrl?: string
   deviceName: string
   forceRelay: boolean
+  /** Offer IPv6 host candidates for WebRTC (direct path for dual-stack peers). */
+  iceIpv6: boolean
   rotatePinnedPeerKey: boolean
   logLevel: 'debug' | 'info' | 'warn' | 'error'
   reconnect: {
@@ -115,6 +117,7 @@ const entryConfigSchema = s.object({
   hostControl: s.object({ enabled: s.boolean() }),
   loopback: s.object({ ports: s.array(s.number()) }),
   forceRelay: s.boolean(),
+  iceIpv6: s.boolean(),
   rotatePinnedPeerKey: s.boolean(),
   logLevel: s.union(['debug', 'info', 'warn', 'error'] as const),
   reconnect: s.union([
@@ -171,6 +174,7 @@ const configSchema = z.object({
   hostControl: z.object({ enabled: z.boolean().optional() }).strict().optional(),
   loopback: z.object({ ports: z.array(z.number().int().min(1024).max(65535)).max(16).optional() }).strict().optional(),
   forceRelay: z.boolean().optional(),
+  iceIpv6: z.boolean().optional(),
   rotatePinnedPeerKey: z.boolean().optional(),
   logLevel: z.enum(['debug', 'info', 'warn', 'error']).optional(),
   reconnect: reconnectSchema.optional(),
@@ -215,6 +219,9 @@ export function resolveConfig(input: ConfigInput = {}, env: NodeJS.ProcessEnv = 
     sidebar: { entry: parsed.sidebar?.entry === 'compact' ? 'compact' : 'standard' },
     loopback: { ports: [...new Set(parsed.loopback?.ports ?? [])] },
     forceRelay: parsed.forceRelay ?? false,
+    // Fork default: dual-stack peers (mobile 5G + home broadband IPv6) can
+    // reach the Host directly without NAT hole punching. Opt out with false.
+    iceIpv6: parsed.iceIpv6 ?? true,
     rotatePinnedPeerKey: parsed.rotatePinnedPeerKey ?? false,
     logLevel: parsed.logLevel ?? 'info',
     reconnect: {
