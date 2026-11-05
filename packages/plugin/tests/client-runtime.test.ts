@@ -1488,6 +1488,7 @@ function config(): ResolvedConfig {
     deviceName: 'Local Harness',
     forceRelay: false,
     iceIpv6: false,
+    selfHost: { enabled: false, port: 8081, account: '', password: '', tunnel: { mode: 'off', token: '' } },
     rotatePinnedPeerKey: false,
     logLevel: 'error',
     reconnect: { enabled: true, initialDelayMs: 100, maxDelayMs: 1_000, jitter: 0 },

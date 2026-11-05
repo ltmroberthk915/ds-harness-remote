@@ -90,6 +90,28 @@ export interface ResolvedConfig {
   codex: ResolvedCodexConfig
   cursor: ResolvedCursorConfig
   acp?: ResolvedAcpConfig
+  /**
+   * Embedded self-hosted Relay server. When enabled the plugin starts
+   * `@dsh-remote/server` in-process and points the Host at it, so no
+   * third-party Server deployment is required (LAN IPv4 by default; set
+   * publicUrl for a tunnel/DDNS origin).
+   */
+  selfHost: {
+    enabled: boolean
+    port: number
+    account: string
+    password: string
+    publicUrl?: string
+    /**
+     * Cloudflare Tunnel ("方案 B"): a named tunnel with a stable HTTPS origin.
+     * The token comes from Zero Trust → Tunnels → Install; DNS/ingress stay in
+     * the Cloudflare dashboard pointing at http://localhost:<port>.
+     */
+    tunnel: {
+      mode: 'off' | 'named'
+      token: string
+    }
+  }
 }
 
 /** The entry's volatile Cordis config: one stable reference for the whole section. */
@@ -137,6 +159,22 @@ const entryConfigSchema = s.object({
     binary: s.string(),
   }),
   acp: s.object({ enabled: s.boolean(), backends: s.array(s.object({ id:s.string(), enabled:s.boolean(), command:s.string(), args:s.array(s.string()), cwd:s.string() })) }),
+  selfHost: s.union([
+    s.boolean(),
+    s.object({
+      port: s.natural().min(1).max(65535),
+      account: s.string(),
+      password: s.string(),
+      publicUrl: s.string(),
+      tunnel: s.union([
+        s.boolean(),
+        s.object({
+          mode: s.union(['off', 'named'] as const),
+          token: s.string(),
+        }),
+      ]),
+    }),
+  ]),
 })
 
 /**
@@ -187,6 +225,22 @@ const configSchema = z.object({
     binary: z.string().trim().min(1).max(4096).optional(),
   }).strict().optional(),
   acp: z.object({ enabled:z.boolean().optional(), backends:z.array(z.object({ id:z.string().trim().regex(/^[a-z0-9][a-z0-9._-]{0,31}$/i), enabled:z.boolean().optional(), command:z.string().trim().min(1).max(4096).optional(), args:z.array(z.string().max(4096)).max(32).optional(), cwd:z.string().max(4096).optional() }).strict()).max(12).optional(), backend:z.string().trim().regex(/^[a-z0-9][a-z0-9._-]{0,31}$/i).optional(), command:z.string().trim().min(1).max(4096).optional(), args:z.array(z.string().max(4096)).max(32).optional(), cwd:z.string().max(4096).optional() }).strict().optional(),
+  selfHost: z.union([
+    z.boolean(),
+    z.object({
+      port: z.number().int().min(1).max(65535).optional(),
+      account: z.string().trim().max(254).optional(),
+      password: z.string().max(1024).optional(),
+      publicUrl: z.string().url().optional(),
+      tunnel: z.union([
+        z.boolean(),
+        z.object({
+          mode: z.enum(['off', 'named']).optional(),
+          token: z.string().max(4096).optional(),
+        }).strict(),
+      ]).optional(),
+    }).strict(),
+  ]).optional(),
 }).strict()
 
 export function resolveConfig(input: ConfigInput = {}, env: NodeJS.ProcessEnv = process.env): ResolvedConfig {
@@ -201,6 +255,12 @@ export function resolveConfig(input: ConfigInput = {}, env: NodeJS.ProcessEnv = 
   const codexEnabled = codexBackend?.enabled ?? parsed.codex?.enabled ?? true
   const acpEnabled = parsed.acp?.enabled ?? true
   const reconnect = typeof parsed.reconnect === 'object' ? parsed.reconnect : {}
+  const selfHostInput = parsed.selfHost
+  const selfHostEnabled = selfHostInput === true || (typeof selfHostInput === 'object' && selfHostInput !== null)
+  const selfHostOptions = typeof selfHostInput === 'object' && selfHostInput !== null ? selfHostInput : {}
+  const tunnelInput = selfHostOptions.tunnel
+  const tunnelEnabled = tunnelInput === true || (typeof tunnelInput === 'object' && tunnelInput !== null)
+  const tunnelOptions = typeof tunnelInput === 'object' && tunnelInput !== null ? tunnelInput : {}
   const configuredServerUrl = parsed.serverUrl ?? env.DSH_REMOTE_SERVER
   const serverUrl = configuredServerUrl === undefined ? undefined : normalizeServerUrl(configuredServerUrl)
   const initialDelayMs = reconnect.initialDelayMs ?? 4_000
@@ -261,6 +321,17 @@ export function resolveConfig(input: ConfigInput = {}, env: NodeJS.ProcessEnv = 
           ...(cwd === undefined ? {} : { cwd }),
         }
       }),
+    },
+    selfHost: {
+      enabled: selfHostEnabled,
+      port: selfHostOptions.port ?? 8081,
+      account: selfHostOptions.account ?? '',
+      password: selfHostOptions.password ?? '',
+      ...(selfHostOptions.publicUrl === undefined ? {} : { publicUrl: selfHostOptions.publicUrl }),
+      tunnel: {
+        mode: tunnelEnabled ? (tunnelOptions.mode ?? 'named') : 'off',
+        token: tunnelOptions.token ?? '',
+      },
     },
   }
 }
