@@ -20,7 +20,9 @@ export function createPreferenceActions({ set, get }: StoreAccess): Pick<AppStat
     async setTransportPreference(preference) {
       await saveTransportPreference(preference)
       const wasConnected = get().connection.phase === 'connected' || get().connection.phase === 'reconnecting'
-      set({ transportPreference: preference })
+      // An explicit path change is the user asking to try again: clear the
+      // session's relay downgrade so the new choice actually applies.
+      set({ transportPreference: preference, relayOnlyUntil: undefined })
       if (wasConnected) await get().reconnect()
     },
 

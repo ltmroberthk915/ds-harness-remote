@@ -10,10 +10,11 @@ import type { AppState } from './store-state'
 import { disconnected } from './store-state'
 
 /** Connection actions use the store's single connection/session runtime. */
-// A network where P2P cannot establish stays that way for hours, not minutes:
-// retrying the full WebRTC budget every 10 minutes made every reconnect pay
-// the multi-second ICE penalty. Manual reconnects still bypass it.
-const RELAY_DOWNGRADE_MS = 6 * 60 * 60_000
+// Once P2P fails on this network, stay on Relay for the whole app session.
+// The store is in-memory, so relaunching the app is the natural retry point:
+// a plain restart re-attempts P2P, while normal reconnects skip the
+// multi-second ICE penalty entirely.
+const RELAY_DOWNGRADE_MS = 100 * 365 * 24 * 60 * 60_000
 /** Host description is presentation data; it must never delay a usable link. */
 const HOST_DESCRIBE_TIMEOUT_MS = 2_000
 
