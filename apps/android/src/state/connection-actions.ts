@@ -10,7 +10,12 @@ import type { AppState } from './store-state'
 import { disconnected } from './store-state'
 
 /** Connection actions use the store's single connection/session runtime. */
-const RELAY_DOWNGRADE_MS = 10 * 60_000
+// A network where P2P cannot establish stays that way for hours, not minutes:
+// retrying the full WebRTC budget every 10 minutes made every reconnect pay
+// the multi-second ICE penalty. Manual reconnects still bypass it.
+const RELAY_DOWNGRADE_MS = 6 * 60 * 60_000
+/** Host description is presentation data; it must never delay a usable link. */
+const HOST_DESCRIBE_TIMEOUT_MS = 2_000
 
 export function createConnectionActions({ get, set, runtime }: SessionAccess): Pick<AppState,
   'connectDevice' | 'reconnect' | 'resumeConnection' | 'refreshConnectionNetworkDetails' | 'disconnect' | 'setOffline'> {
@@ -154,10 +159,17 @@ export function createConnectionActions({ get, set, runtime }: SessionAccess): P
         const proxy = runtime.connection.requireProxy()
         // Catalogs belong to the category the user opens, not connection setup.
         // Both reads are independent: run them together instead of paying two
-        // sequential round trips before the session can open.
+        // sequential round trips before the session can open. The Host
+        // description is presentation data: when it is slow, fall back to the
+        // previous value instead of delaying a usable connection.
         const describeStartedAt = Date.now()
+        const fallbackDescriptor = get().hostDescriptor
+        const describeTimeout = new Promise<undefined>(resolve => {
+          setTimeout(() => resolve(undefined), HOST_DESCRIBE_TIMEOUT_MS)
+        })
         const [hostDescriptor, connectionNetworkDetails] = await Promise.all([
-          proxy.hostDescribe(),
+          Promise.race([proxy.hostDescribe().catch(() => undefined), describeTimeout])
+            .then(value => value ?? fallbackDescriptor),
           runtime.connection.getNetworkDetails().catch(() => undefined),
         ])
         const describeMs = Date.now() - describeStartedAt

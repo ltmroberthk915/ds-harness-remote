@@ -83,10 +83,13 @@ export class AndroidRemoteConnection {
       preferredTransports: options.forceRelay || relayOnly
         ? ['relay']
         : options.preferredTransports ?? ['lan', 'p2p', 'turn', 'relay'],
-      // Mobile hole punching either succeeds quickly or not at all; 6s keeps
-      // a failed P2P attempt from stalling the whole connect pipeline.
-      negotiateTimeoutMs: 6_000,
-      iceServersTimeoutMs: 5_000,
+      // Mobile hole punching either succeeds quickly or not at all. Both
+      // budgets were measured against a real failed connect: 5s ICE fetch +
+      // 6s WebRTC wait = 9s spent before Relay even started. A TURN
+      // credential fetch that cannot answer in 2s is treated as unavailable,
+      // and 4s is enough for a P2P path that will actually establish.
+      negotiateTimeoutMs: 4_000,
+      iceServersTimeoutMs: 2_000,
       fetchIceServers: options.fetchIceServers,
       onDisconnect: event => {
         // Refused/replaced credentials, protocol errors and malformed frames
