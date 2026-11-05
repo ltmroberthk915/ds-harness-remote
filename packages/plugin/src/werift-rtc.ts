@@ -223,6 +223,8 @@ export interface WeriftFactoryOptions {
   preferredHostIpv4Candidates?: readonly string[]
   routeTargets?: readonly string[]
   routeProbeTimeoutMs?: number
+  /** Offer IPv6 host candidates (direct path for dual-stack peers). */
+  iceIpv6?: boolean
 }
 
 /** Synchronous factory for tests and callers that already resolved werift. */
@@ -564,6 +566,9 @@ function isCacheableFactoryOptions(options: WeriftFactoryOptions): boolean {
   return options.interfaces === undefined
     && options.preferredHostIpv4Candidates === undefined
     && options.routeTargets === undefined
+    // Candidate family is part of the factory behavior; never share a cached
+    // factory across different IPv6 settings.
+    && options.iceIpv6 === undefined
 }
 
 function parseIceCandidate(candidate: RtcIceCandidateInit): WeriftCandidate | undefined {

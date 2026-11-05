@@ -1487,6 +1487,7 @@ function config(): ResolvedConfig {
     serverUrl: 'https://dsh.r2049.cn',
     deviceName: 'Local Harness',
     forceRelay: false,
+    iceIpv6: false,
     rotatePinnedPeerKey: false,
     logLevel: 'error',
     reconnect: { enabled: true, initialDelayMs: 100, maxDelayMs: 1_000, jitter: 0 },

@@ -1175,6 +1175,7 @@ function config(): ResolvedConfig {
     serverUrl: 'https://dsh.r2049.cn',
     deviceName: 'Host',
     forceRelay: true,
+    iceIpv6: false,
     rotatePinnedPeerKey: false,
     logLevel: 'error',
     reconnect: { enabled: false, initialDelayMs: 100, maxDelayMs: 1_000, jitter: 0 },

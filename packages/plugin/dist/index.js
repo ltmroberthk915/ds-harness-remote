@@ -56277,6 +56277,22 @@ function parseWireJson(input4) {
   }
 }
 
+// ../protocol/dist/close-semantics.js
+var SERVER_SHUTDOWN_REASON = "server shutdown";
+var SERVER_SHUTDOWN_CLOSE_CODES = [4009, 4001, 1013];
+var HEARTBEAT_TIMEOUT_CLOSE_CODE = 4009;
+var HEARTBEAT_TIMEOUT_REASON = "heartbeat timeout";
+var HEARTBEAT_CONNECTION_FAILED_REASON = "CONNECTION_FAILED";
+function normalizeReason(reason) {
+  return typeof reason === "string" ? reason.trim() : "";
+}
+function isServerShutdownClose(code, reason) {
+  return SERVER_SHUTDOWN_CLOSE_CODES.includes(code) && normalizeReason(reason) === SERVER_SHUTDOWN_REASON;
+}
+function isHeartbeatTimeoutClose(code, reason) {
+  return code === HEARTBEAT_TIMEOUT_CLOSE_CODE && normalizeReason(reason) === HEARTBEAT_TIMEOUT_REASON || code === 4001 && normalizeReason(reason) === HEARTBEAT_CONNECTION_FAILED_REASON;
+}
+
 // ../protocol/dist/index.js
 var WEBRTC_RESUME_CAPABILITY = "transport.webrtc.resume.v1";
 var RELAY_RESUME_CAPABILITY = "transport.relay.resume.v1";
@@ -61067,6 +61083,11 @@ var ControlLease = class {
     }
     return true;
   }
+  remainingMs() {
+    if (!this.confirmed || this.stopped || !this.deadline)
+      return void 0;
+    return Math.max(0, Math.min(this.deadline.mono - performance.now(), this.deadline.wall - Date.now()));
+  }
   canDetach() {
     return this.confirmed && this.valid();
   }
@@ -61196,7 +61217,7 @@ var AdaptiveTransport = class extends BaseTransport {
       };
       socket.onclose = (event) => {
         if (this.lifetime === lifetime && this.socket === socket)
-          this.controlLost(adaptiveControlCloseError(event), { reason: "control-closed", closeCode: event.code });
+          this.controlLost(adaptiveControlCloseError(event), { reason: "control-closed", closeCode: event.code, closeReason: event.reason });
       };
     });
   }
@@ -61240,12 +61261,14 @@ var AdaptiveTransport = class extends BaseTransport {
     };
   }
   async connectionDetails() {
+    const remainingMs = this.lease?.remainingMs();
     return {
       ...this.connectionId === void 0 ? {} : { connectionId: this.connectionId },
       ...this.connectedAt === void 0 ? {} : { connectedAt: this.connectedAt },
       ...this.heartbeatIntervalMs === void 0 ? {} : { heartbeatIntervalMs: this.heartbeatIntervalMs },
       ...this.lastControlReceivedAt === void 0 ? {} : { lastControlReceivedAt: this.lastControlReceivedAt },
       ...this.lastControlSentAt === void 0 ? {} : { lastControlSentAt: this.lastControlSentAt },
+      recoveryExpiresAt: remainingMs === void 0 ? void 0 : Date.now() + remainingMs,
       controlChannelUrl: this.url,
       controlChannelState: socketState(this.socket?.readyState),
       preferredTransports: this.options.forceRelay === true ? ["relay"] : [...this.options.preferredTransports ?? DEFAULT_PREFERRED_TRANSPORTS],
@@ -61569,7 +61592,8 @@ var AdaptiveTransport = class extends BaseTransport {
     socket?.close();
     if (this.recoveryTimer !== void 0)
       return;
-    const delay = this.recoveryAttempt++ === 0 ? 0 : Math.min(15e3, 1e3 * 2 ** Math.min(this.recoveryAttempt, 4)) * (0.8 + Math.random() * 0.4);
+    const delay = recoveryDelayMs(this.recoveryAttempt, diagnostic);
+    this.recoveryAttempt++;
     this.recoveryTimer = setTimeout(() => {
       this.recoveryTimer = void 0;
       void this.reopenControl();
@@ -61611,7 +61635,7 @@ var AdaptiveTransport = class extends BaseTransport {
       };
       socket.onclose = (event) => {
         if (this.socket === socket)
-          this.controlLost(adaptiveControlCloseError(event), { reason: "control-closed", closeCode: event.code });
+          this.controlLost(adaptiveControlCloseError(event), { reason: "control-closed", closeCode: event.code, closeReason: event.reason });
       };
     } catch (error62) {
       if (this.lifetime !== lifetime)
@@ -61787,6 +61811,7 @@ var AdaptiveTransport = class extends BaseTransport {
     }
     const established = this.connectedAt !== void 0;
     this.controlReady = false;
+    this.recoveryAttempt = 0;
     this.lease?.stop();
     this.lease = void 0;
     this.recoveryTicket = void 0;
@@ -61833,13 +61858,18 @@ var AdaptiveTransport = class extends BaseTransport {
   }
 };
 function adaptiveControlCloseError(event) {
-  const heartbeatTimeout = event.code === 4001 && (event.reason === "CONNECTION_FAILED" || event.reason === "server shutdown") || event.code === 4009;
+  const serverShutdown = isServerShutdownClose(event.code, event.reason);
+  const heartbeatTimeout = isHeartbeatTimeoutClose(event.code, event.reason);
   const reason = event.reason.trim().slice(0, 300);
   const detail = reason.length > 0 ? `${reason} (WebSocket ${event.code})` : `WebSocket closed with code ${event.code}`;
   return Object.assign(new Error(`Adaptive control channel closed: ${detail}`), {
     code: event.code === 4003 ? "CONNECTION_REPLACED" : "TRANSPORT_CLOSED",
-    retryable: heartbeatTimeout || event.code === 1e3 || event.code === 1001 || event.code === 1006 || event.code === 1011 || event.code === 1012 || event.code === 1013
+    retryable: serverShutdown || heartbeatTimeout || [1e3, 1001, 1006, 1011, 1012, 1013].includes(event.code)
   });
+}
+var CONTROL_RECOVERY_MAX_DELAY_MS = 15e3;
+function recoveryDelayMs(_attempt, _diagnostic) {
+  return Math.random() * CONTROL_RECOVERY_MAX_DELAY_MS;
 }
 function isObject2(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -74614,6 +74644,7 @@ var entryConfigSchema = s.object({
   hostControl: s.object({ enabled: s.boolean() }),
   loopback: s.object({ ports: s.array(s.number()) }),
   forceRelay: s.boolean(),
+  iceIpv6: s.boolean(),
   rotatePinnedPeerKey: s.boolean(),
   logLevel: s.union(["debug", "info", "warn", "error"]),
   reconnect: s.union([
@@ -74658,6 +74689,7 @@ var configSchema = external_exports.object({
   hostControl: external_exports.object({ enabled: external_exports.boolean().optional() }).strict().optional(),
   loopback: external_exports.object({ ports: external_exports.array(external_exports.number().int().min(1024).max(65535)).max(16).optional() }).strict().optional(),
   forceRelay: external_exports.boolean().optional(),
+  iceIpv6: external_exports.boolean().optional(),
   rotatePinnedPeerKey: external_exports.boolean().optional(),
   logLevel: external_exports.enum(["debug", "info", "warn", "error"]).optional(),
   reconnect: reconnectSchema.optional(),
@@ -74698,6 +74730,9 @@ function resolveConfig(input4 = {}, env = process.env) {
     sidebar: { entry: parsed.sidebar?.entry === "compact" ? "compact" : "standard" },
     loopback: { ports: [...new Set(parsed.loopback?.ports ?? [])] },
     forceRelay: parsed.forceRelay ?? false,
+    // Fork default: dual-stack peers (mobile 5G + home broadband IPv6) can
+    // reach the Host directly without NAT hole punching. Opt out with false.
+    iceIpv6: parsed.iceIpv6 ?? true,
     rotatePinnedPeerKey: parsed.rotatePinnedPeerKey ?? false,
     logLevel: parsed.logLevel ?? "info",
     reconnect: {
@@ -76402,7 +76437,10 @@ function buildWeriftFactory(werift, options = {}) {
       const raw = new werift.RTCPeerConnection({
         iceServers: orderIceServersForWerift(configuration.iceServers ?? []),
         iceUseIpv4: true,
-        iceUseIpv6: false,
+        // IPv6 host candidates let a dual-stack client (mobile carriers usually
+        // are) reach this Host without NAT hole punching at all. Disabled by
+        // default historically; callers opt in through the plugin config.
+        iceUseIpv6: options.iceIpv6 === true,
         iceUseLinkLocalAddress: false,
         ...hostIpv4Candidates.length === 0 ? {} : {
           iceAdditionalHostAddresses: hostIpv4Candidates,
@@ -76771,7 +76809,7 @@ async function detectRouteHostIpv4(target3, timeoutMs) {
   }
 }
 function isCacheableFactoryOptions(options) {
-  return options.interfaces === void 0 && options.preferredHostIpv4Candidates === void 0 && options.routeTargets === void 0;
+  return options.interfaces === void 0 && options.preferredHostIpv4Candidates === void 0 && options.routeTargets === void 0 && options.iceIpv6 === void 0;
 }
 function parseIceCandidate(candidate) {
   const value = candidate.candidate?.trim();
@@ -89328,7 +89366,10 @@ var HostPluginRuntime = class {
       this.connections,
       this.logger,
       void 0,
-      this.config.forceRelay ? void 0 : () => loadNodeRtcFactory({ routeTargets: this.config.serverUrl === void 0 ? [] : [this.config.serverUrl] }),
+      this.config.forceRelay ? void 0 : () => loadNodeRtcFactory({
+        routeTargets: this.config.serverUrl === void 0 ? [] : [this.config.serverUrl],
+        iceIpv6: this.config.iceIpv6
+      }),
       () => this.hostCapabilities(),
       this.harnessVersion
     );
