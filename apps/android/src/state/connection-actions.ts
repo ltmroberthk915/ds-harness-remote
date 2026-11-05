@@ -174,16 +174,22 @@ export function createConnectionActions({ get, set, runtime }: SessionAccess): P
         return true
       } catch (error) {
         if (generation !== runtime.connectionGeneration) return false
-        console.warn('[dsh-remote] Connection setup failed at stage:', get().connectionStage, error)
+        // Capture before close(): the carrier's close handler clears it.
+        const failedStage = get().connectionStage
+        console.warn('[dsh-remote] Connection setup failed at stage:', failedStage, error)
         await runtime.connection.close({ preserveRecovery: recovering && !isSessionAuthError(error) })
         if (isSessionAuthError(error)) {
           await get().requireReauth(friendlyError(error))
           return false
         }
         const message = friendlyError(error)
+        // Failure inside transport negotiation means P2P/TURN could not
+        // establish: remember relay-only so the automatic retry (and the next
+        // manual attempt) skips the multi-second WebRTC wait entirely.
         set({
           connection: { phase: 'offline', stats: { mode: 'Disconnected', connected: false }, error: message },
           connectionStage: undefined,
+          ...(failedStage === 'transport' ? { relayOnlyUntil: Date.now() + RELAY_DOWNGRADE_MS } : {}),
           codexAvailable: false,
           cursorAvailable: false,
           antigravityAvailable: false,

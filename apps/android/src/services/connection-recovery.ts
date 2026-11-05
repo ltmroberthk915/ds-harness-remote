@@ -10,6 +10,12 @@ interface RecoveryState {
 // First retry is immediate: a dropped P2P path should recover in ~1s over
 // the relay, not after a fixed 1s timer plus the whole connect pipeline.
 const RETRY_DELAYS_MS = [0, 1_000, 3_000, 8_000, 15_000, 30_000, 30_000, 60_000]
+/**
+ * A connection that never established gets fewer, faster retries: the first
+ * attempt already waited out its WebRTC budget, and every retry runs the
+ * full handshake. Relay-only retries here are cheap; endless retries are not.
+ */
+const FIRST_CONNECT_RETRY_COUNT = 2
 
 /** Recover a previously connected Host while its runtime is retained; never replay a mutation. */
 export class ForegroundConnectionRecovery {
@@ -44,12 +50,14 @@ export class ForegroundConnectionRecovery {
   update(): void {
     const state = this.read()
     const hostId = state.selectedDevice?.deviceId
+    let reset = false
     if (hostId !== this.hostId || state.connection.phase === 'disconnected' || state.reauthRequired) {
       this.cancelTimer()
       this.hostId = hostId
       this.armed = false
       this.attempts = 0
       this.exhausted = false
+      reset = true
     }
     if (state.reauthRequired) return
     if (state.connection.phase === 'connected') {
@@ -60,20 +68,26 @@ export class ForegroundConnectionRecovery {
         this.exhausted = false
       }
     }
-    if (!this.active || !this.armed || hostId === undefined || state.connection.phase !== 'offline'
+    // A reset means the lifecycle changed (new host, logout, sign-out): this
+    // call must not schedule a retry for state that no longer applies.
+    if (reset) return
+    if (!this.active || hostId === undefined || state.connection.phase !== 'offline'
       || state.connection.retryable === false) {
       this.cancelTimer()
-      // Setup can lose its carrier before the store ever published connected.
-      // There is then no armed retry owner to retain the native service.
+      // A refused (non-retryable) offline state has no retry owner; still
+      // release the retained native service exactly once.
       if (this.active && state.connection.phase === 'offline'
-        && (!this.armed || state.connection.retryable === false) && !this.exhausted) {
+        && state.connection.retryable === false && !this.exhausted) {
         this.exhausted = true
         this.onExhausted()
       }
       return
     }
     if (this.timer !== undefined || this.inFlight) return
-    if (this.attempts >= RETRY_DELAYS_MS.length) {
+    // Late-connected hosts use the full ladder; a first attempt that never
+    // established retries immediately over Relay before giving up.
+    const maxAttempts = this.armed ? RETRY_DELAYS_MS.length : FIRST_CONNECT_RETRY_COUNT
+    if (this.attempts >= maxAttempts) {
       if (!this.exhausted) {
         this.exhausted = true
         this.onExhausted()

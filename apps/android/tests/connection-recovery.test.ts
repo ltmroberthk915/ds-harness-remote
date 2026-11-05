@@ -74,9 +74,22 @@ describe('foreground carrier recovery', () => {
         if (action === 'refused') state.connection.retryable = false
         if (action === 'manual-connect') state.connection.phase = 'connecting'
         recovery.update()
+        if (action === 'never-connected') {
+          // A first attempt that never established retries twice immediately
+          // over Relay and then gives up instead of hanging.
+          await vi.advanceTimersByTimeAsync(0)
+          expect(reconnect).toHaveBeenCalledTimes(1)
+          expect(reconnect).toHaveBeenLastCalledWith({ forceRelay: true })
+          await vi.advanceTimersByTimeAsync(1_000)
+          expect(reconnect).toHaveBeenCalledTimes(2)
+          await vi.advanceTimersByTimeAsync(300_000)
+          expect(reconnect).toHaveBeenCalledTimes(2)
+          expect(exhausted).toHaveBeenCalledOnce()
+          return
+        }
         await vi.advanceTimersByTimeAsync(30_000)
         expect(reconnect).not.toHaveBeenCalled()
-        if (action === 'never-connected' || action === 'refused') expect(exhausted).toHaveBeenCalledOnce()
+        if (action === 'refused') expect(exhausted).toHaveBeenCalledOnce()
       } })), prepare)
   })
 

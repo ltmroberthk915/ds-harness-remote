@@ -64,7 +64,6 @@ export class AndroidRemoteConnection {
     if (attempt !== this.connectionAttempt) throw new Error('The connection attempt was superseded.')
     this.muxHandler = onFrame
     let webRtcFallback = false
-    let replacingFallback = false
     let retryableClose = true
     let lastTransport: 'lan' | 'p2p' | 'turn' | 'relay' | undefined
     const createTransport = (relayOnly: boolean) => new AdaptiveTransport(websocketUrl(baseUrl), {
@@ -77,9 +76,9 @@ export class AndroidRemoteConnection {
       preferredTransports: options.forceRelay || relayOnly
         ? ['relay']
         : options.preferredTransports ?? ['lan', 'p2p', 'turn', 'relay'],
-      // Mobile hole punching is fast when it works; never let the server's
-      // fallback hint stretch the wait, and cap the ICE credential fetch.
-      negotiateTimeoutMs: 8_000,
+      // Mobile hole punching either succeeds quickly or not at all; 6s keeps
+      // a failed P2P attempt from stalling the whole connect pipeline.
+      negotiateTimeoutMs: 6_000,
       iceServersTimeoutMs: 5_000,
       fetchIceServers: options.fetchIceServers,
       onDisconnect: event => {
@@ -135,28 +134,18 @@ export class AndroidRemoteConnection {
         this.cursor = undefined
         this.acpBackends.clear()
         this.sessionTools = undefined
-        if (!replacingFallback) options.onClose?.({ retryable: retryableClose, ...(lastTransport !== undefined ? { lastTransport } : {}) })
+        options.onClose?.({ retryable: retryableClose, ...(lastTransport !== undefined ? { lastTransport } : {}) })
       })
       await core.connect()
       if (attempt !== this.connectionAttempt || this.core !== core) throw new Error('The connection attempt was superseded.')
       return core
     }
     try {
-      let core = await connectCore(false)
-      // Mirror the Desktop plugin: Hosts that accepted a WebRTC offer before
-      // the client fell back can later close that logical Relay connection.
-      // A new relay-only connection ID prevents that stale RTC state leaking
-      // into the working fallback channel.
-      if (webRtcFallback) {
-        replacingFallback = true
-        await core.close()
-        this.unsubscribeClose?.()
-        this.unsubscribeClose = undefined
-        this.core = undefined
-        replacingFallback = false
-        webRtcFallback = false
-        core = await connectCore(true)
-      }
+      // A WebRTC fallback continues on the same connection id: the Host keeps
+      // the tunnel alive and switches its data plane to Relay. Rebuilding a
+      // second relay-only connection doubled every fallback into two full
+      // handshakes and added 10s+ to mobile connections.
+      const core = await connectCore(false)
       const features = await probeRemoteHostFeatures(core, host.clientVersion)
       if (attempt !== this.connectionAttempt || this.core !== core) throw new Error('The connection attempt was superseded.')
       const emitFrame = (frame: MuxStreamFrame) => {
