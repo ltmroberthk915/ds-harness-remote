@@ -74634,22 +74634,17 @@ var entryConfigSchema = s.object({
     binary: s.string()
   }),
   acp: s.object({ enabled: s.boolean(), backends: s.array(s.object({ id: s.string(), enabled: s.boolean(), command: s.string(), args: s.array(s.string()), cwd: s.string() })) }),
-  selfHost: s.union([
-    s.boolean(),
-    s.object({
-      port: s.natural().min(1).max(65535),
-      account: s.string(),
-      password: s.string(),
-      publicUrl: s.string(),
-      tunnel: s.union([
-        s.boolean(),
-        s.object({
-          mode: s.union(["off", "named"]),
-          token: s.string()
-        })
-      ])
+  selfHost: s.object({
+    enabled: s.boolean(),
+    port: s.natural().min(1).max(65535),
+    account: s.string(),
+    password: s.string(),
+    publicUrl: s.string(),
+    tunnel: s.object({
+      mode: s.union(["off", "named"]),
+      token: s.string()
     })
-  ])
+  })
 });
 function withVolatileSchema(schema) {
   const volatile = schema.volatile;
@@ -74688,22 +74683,17 @@ var configSchema = external_exports.object({
     binary: external_exports.string().trim().min(1).max(4096).optional()
   }).strict().optional(),
   acp: external_exports.object({ enabled: external_exports.boolean().optional(), backends: external_exports.array(external_exports.object({ id: external_exports.string().trim().regex(/^[a-z0-9][a-z0-9._-]{0,31}$/i), enabled: external_exports.boolean().optional(), command: external_exports.string().trim().min(1).max(4096).optional(), args: external_exports.array(external_exports.string().max(4096)).max(32).optional(), cwd: external_exports.string().max(4096).optional() }).strict()).max(12).optional(), backend: external_exports.string().trim().regex(/^[a-z0-9][a-z0-9._-]{0,31}$/i).optional(), command: external_exports.string().trim().min(1).max(4096).optional(), args: external_exports.array(external_exports.string().max(4096)).max(32).optional(), cwd: external_exports.string().max(4096).optional() }).strict().optional(),
-  selfHost: external_exports.union([
-    external_exports.boolean(),
-    external_exports.object({
-      port: external_exports.number().int().min(1).max(65535).optional(),
-      account: external_exports.string().trim().max(254).optional(),
-      password: external_exports.string().max(1024).optional(),
-      publicUrl: external_exports.string().url().optional(),
-      tunnel: external_exports.union([
-        external_exports.boolean(),
-        external_exports.object({
-          mode: external_exports.enum(["off", "named"]).optional(),
-          token: external_exports.string().max(4096).optional()
-        }).strict()
-      ]).optional()
-    }).strict()
-  ]).optional()
+  selfHost: external_exports.object({
+    enabled: external_exports.boolean().optional(),
+    port: external_exports.number().int().min(1).max(65535).optional(),
+    account: external_exports.string().trim().max(254).optional(),
+    password: external_exports.string().max(1024).optional(),
+    publicUrl: external_exports.string().url().optional(),
+    tunnel: external_exports.object({
+      mode: external_exports.enum(["off", "named"]).optional(),
+      token: external_exports.string().max(4096).optional()
+    }).strict().optional()
+  }).strict().optional()
 }).strict();
 function resolveConfig(input4 = {}, env = process.env) {
   const parsed = configSchema.parse(input4);
@@ -74714,12 +74704,9 @@ function resolveConfig(input4 = {}, env = process.env) {
   const codexEnabled = codexBackend?.enabled ?? parsed.codex?.enabled ?? true;
   const acpEnabled = parsed.acp?.enabled ?? true;
   const reconnect = typeof parsed.reconnect === "object" ? parsed.reconnect : {};
-  const selfHostInput = parsed.selfHost;
-  const selfHostEnabled = selfHostInput === true || typeof selfHostInput === "object" && selfHostInput !== null;
-  const selfHostOptions = typeof selfHostInput === "object" && selfHostInput !== null ? selfHostInput : {};
-  const tunnelInput = selfHostOptions.tunnel;
-  const tunnelEnabled = tunnelInput === true || typeof tunnelInput === "object" && tunnelInput !== null;
-  const tunnelOptions = typeof tunnelInput === "object" && tunnelInput !== null ? tunnelInput : {};
+  const selfHostOptions = parsed.selfHost ?? {};
+  const selfHostEnabled = selfHostOptions.enabled ?? false;
+  const tunnelOptions = selfHostOptions.tunnel ?? {};
   const configuredServerUrl = parsed.serverUrl ?? env.DSH_REMOTE_SERVER;
   const serverUrl = configuredServerUrl === void 0 ? void 0 : normalizeServerUrl(configuredServerUrl);
   const initialDelayMs = reconnect.initialDelayMs ?? 4e3;
@@ -74781,7 +74768,7 @@ function resolveConfig(input4 = {}, env = process.env) {
       password: selfHostOptions.password ?? "",
       ...selfHostOptions.publicUrl === void 0 ? {} : { publicUrl: selfHostOptions.publicUrl },
       tunnel: {
-        mode: tunnelEnabled ? tunnelOptions.mode ?? "named" : "off",
+        mode: tunnelOptions.mode === "named" ? "named" : "off",
         token: tunnelOptions.token ?? ""
       }
     }

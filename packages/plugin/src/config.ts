@@ -159,22 +159,17 @@ const entryConfigSchema = s.object({
     binary: s.string(),
   }),
   acp: s.object({ enabled: s.boolean(), backends: s.array(s.object({ id:s.string(), enabled:s.boolean(), command:s.string(), args:s.array(s.string()), cwd:s.string() })) }),
-  selfHost: s.union([
-    s.boolean(),
-    s.object({
-      port: s.natural().min(1).max(65535),
-      account: s.string(),
-      password: s.string(),
-      publicUrl: s.string(),
-      tunnel: s.union([
-        s.boolean(),
-        s.object({
-          mode: s.union(['off', 'named'] as const),
-          token: s.string(),
-        }),
-      ]),
+  selfHost: s.object({
+    enabled: s.boolean(),
+    port: s.natural().min(1).max(65535),
+    account: s.string(),
+    password: s.string(),
+    publicUrl: s.string(),
+    tunnel: s.object({
+      mode: s.union(['off', 'named'] as const),
+      token: s.string(),
     }),
-  ]),
+  }),
 })
 
 /**
@@ -225,22 +220,17 @@ const configSchema = z.object({
     binary: z.string().trim().min(1).max(4096).optional(),
   }).strict().optional(),
   acp: z.object({ enabled:z.boolean().optional(), backends:z.array(z.object({ id:z.string().trim().regex(/^[a-z0-9][a-z0-9._-]{0,31}$/i), enabled:z.boolean().optional(), command:z.string().trim().min(1).max(4096).optional(), args:z.array(z.string().max(4096)).max(32).optional(), cwd:z.string().max(4096).optional() }).strict()).max(12).optional(), backend:z.string().trim().regex(/^[a-z0-9][a-z0-9._-]{0,31}$/i).optional(), command:z.string().trim().min(1).max(4096).optional(), args:z.array(z.string().max(4096)).max(32).optional(), cwd:z.string().max(4096).optional() }).strict().optional(),
-  selfHost: z.union([
-    z.boolean(),
-    z.object({
-      port: z.number().int().min(1).max(65535).optional(),
-      account: z.string().trim().max(254).optional(),
-      password: z.string().max(1024).optional(),
-      publicUrl: z.string().url().optional(),
-      tunnel: z.union([
-        z.boolean(),
-        z.object({
-          mode: z.enum(['off', 'named']).optional(),
-          token: z.string().max(4096).optional(),
-        }).strict(),
-      ]).optional(),
-    }).strict(),
-  ]).optional(),
+  selfHost: z.object({
+    enabled: z.boolean().optional(),
+    port: z.number().int().min(1).max(65535).optional(),
+    account: z.string().trim().max(254).optional(),
+    password: z.string().max(1024).optional(),
+    publicUrl: z.string().url().optional(),
+    tunnel: z.object({
+      mode: z.enum(['off', 'named']).optional(),
+      token: z.string().max(4096).optional(),
+    }).strict().optional(),
+  }).strict().optional(),
 }).strict()
 
 export function resolveConfig(input: ConfigInput = {}, env: NodeJS.ProcessEnv = process.env): ResolvedConfig {
@@ -255,12 +245,9 @@ export function resolveConfig(input: ConfigInput = {}, env: NodeJS.ProcessEnv = 
   const codexEnabled = codexBackend?.enabled ?? parsed.codex?.enabled ?? true
   const acpEnabled = parsed.acp?.enabled ?? true
   const reconnect = typeof parsed.reconnect === 'object' ? parsed.reconnect : {}
-  const selfHostInput = parsed.selfHost
-  const selfHostEnabled = selfHostInput === true || (typeof selfHostInput === 'object' && selfHostInput !== null)
-  const selfHostOptions = typeof selfHostInput === 'object' && selfHostInput !== null ? selfHostInput : {}
-  const tunnelInput = selfHostOptions.tunnel
-  const tunnelEnabled = tunnelInput === true || (typeof tunnelInput === 'object' && tunnelInput !== null)
-  const tunnelOptions = typeof tunnelInput === 'object' && tunnelInput !== null ? tunnelInput : {}
+  const selfHostOptions = parsed.selfHost ?? {}
+  const selfHostEnabled = selfHostOptions.enabled ?? false
+  const tunnelOptions = selfHostOptions.tunnel ?? {}
   const configuredServerUrl = parsed.serverUrl ?? env.DSH_REMOTE_SERVER
   const serverUrl = configuredServerUrl === undefined ? undefined : normalizeServerUrl(configuredServerUrl)
   const initialDelayMs = reconnect.initialDelayMs ?? 4_000
@@ -329,7 +316,7 @@ export function resolveConfig(input: ConfigInput = {}, env: NodeJS.ProcessEnv = 
       password: selfHostOptions.password ?? '',
       ...(selfHostOptions.publicUrl === undefined ? {} : { publicUrl: selfHostOptions.publicUrl }),
       tunnel: {
-        mode: tunnelEnabled ? (tunnelOptions.mode ?? 'named') : 'off',
+        mode: tunnelOptions.mode === 'named' ? 'named' : 'off',
         token: tunnelOptions.token ?? '',
       },
     },
