@@ -31,9 +31,9 @@ describe('HarnessRemoteBridge', () => {
 
   it('rejects plugin-management bypasses before native mutation', async () => {
     await runScenarios([
-      { name: 'Remote entry', endpoint: 'pluginManager/setPluginEnabled', args: { id: 'remote', enabled: false }, rows: [{ entryId: 'remote', moduleName: 'ds-harness-remote' }] },
-      { name: 'Remote bundle', endpoint: 'pluginManager/setBundleEnabled', args: { name: 'ds-harness-remote', enabled: false }, rows: [{ name: 'ds-harness-remote', rows: [] }] },
-      { name: 'bundle contains Remote', endpoint: 'pluginManager/setBundleEnabled', args: { name: 'bundle', enabled: true }, rows: [{ name: 'bundle', rows: [{ moduleName: 'ds-harness-remote/client' }] }] },
+      { name: 'Remote entry', endpoint: 'pluginManager/setPluginEnabled', args: { id: 'remote', enabled: false }, rows: [{ entryId: 'remote', moduleName: 'dsh-agent-remote' }] },
+      { name: 'Remote bundle', endpoint: 'pluginManager/setBundleEnabled', args: { name: 'dsh-agent-remote', enabled: false }, rows: [{ name: 'dsh-agent-remote', rows: [] }] },
+      { name: 'bundle contains Remote', endpoint: 'pluginManager/setBundleEnabled', args: { name: 'bundle', enabled: true }, rows: [{ name: 'bundle', rows: [{ moduleName: 'dsh-agent-remote/client' }] }] },
       { name: 'protected entry', endpoint: 'pluginManager/setPluginEnabled', args: { id: 'core', enabled: false }, rows: [{ entryId: 'core', moduleName: 'core', readOnlyReason: 'management-required' }] },
       { name: 'unknown entry', endpoint: 'pluginManager/setPluginEnabled', args: { id: 'missing', enabled: true }, rows: [] },
       { name: 'invalid boolean', endpoint: 'pluginManager/setPluginEnabled', args: { id: 'entry', enabled: 'false' }, rows: [] },

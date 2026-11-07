@@ -44,17 +44,17 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-export const name = 'ds-harness-remote'
+export const name = 'dsh-agent-remote'
 export { Config }
 
 const legacyLoaderModuleNames = new Set(['dsh-remote', '@dsh-remote/plugin'])
 // Settings-registry generation (≤0.1.6). The branded `SettingsNamespace` type
 // was removed with the registry in rc.1, so the literals stay plain strings.
-const pluginSettingsNamespace = 'ds-harness-remote'
+const pluginSettingsNamespace = 'dsh-agent-remote'
 const legacySettingsNamespace = 'dsh-remote'
 
 /** Fallback entry id when the Loader cannot locate this plugin's entry. */
-const DEFAULT_ENTRY_ID = 'ds-harness-remote'
+const DEFAULT_ENTRY_ID = 'dsh-agent-remote'
 /** Root include entry id prefixing every profile row's Loader path id. */
 const INCLUDE_ENTRY_PREFIX = 'include:'
 
@@ -119,7 +119,7 @@ export function apply(ctx: Context, entry: EntryConfig | ConfigShape | undefined
   // The scoped TUI entry is the normal activation path. Direct composition
   // tests and older partial TUI profiles can still opt in by providing the
   // command and scene registries explicitly.
-  const tuiEntry = entryId === 'ds-harness-remote-tui'
+  const tuiEntry = entryId === 'dsh-agent-remote-tui'
   const tuiCommandsAvailable = ctx.get('commands', false) !== undefined
     && (tuiEntry || ctx.get('tuiScenes', false) !== undefined)
   const tuiBinding: TuiRemoteBinding | undefined = tuiCommandsAvailable ? {} : undefined

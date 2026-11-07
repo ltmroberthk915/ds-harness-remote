@@ -74643,6 +74643,7 @@ var entryConfigSchema = s.object({
   enabled: s.boolean(),
   role: s.union(["host", "client", "both"]),
   serverUrl: s.string(),
+  fallbackServerUrl: s.string(),
   deviceName: s.string(),
   terminal: s.object({ enabled: s.boolean() }),
   remoteTools: s.object({ enabled: s.boolean() }),
@@ -74699,6 +74700,7 @@ var configSchema = external_exports.object({
   enabled: external_exports.boolean().optional(),
   role: external_exports.enum(["host", "client", "both"]).optional(),
   serverUrl: external_exports.string().url().optional(),
+  fallbackServerUrl: external_exports.string().url().optional(),
   deviceName: external_exports.string().trim().min(1).max(80).optional(),
   terminal: external_exports.object({ enabled: external_exports.boolean().optional() }).strict().optional(),
   remoteTools: external_exports.object({ enabled: external_exports.boolean().optional() }).strict().optional(),
@@ -74744,7 +74746,9 @@ function resolveConfig(input4 = {}, env = process.env) {
   const selfHostEnabled = selfHostOptions.enabled ?? false;
   const tunnelOptions = selfHostOptions.tunnel ?? {};
   const configuredServerUrl = parsed.serverUrl ?? env.DSH_REMOTE_SERVER;
+  const configuredFallbackServerUrl = parsed.fallbackServerUrl ?? env.DSH_REMOTE_FALLBACK_SERVER;
   const serverUrl = configuredServerUrl === void 0 ? void 0 : normalizeServerUrl(configuredServerUrl);
+  const fallbackServerUrl = configuredFallbackServerUrl === void 0 ? void 0 : normalizeServerUrl(configuredFallbackServerUrl);
   const initialDelayMs = reconnect.initialDelayMs ?? 4e3;
   const maxDelayMs = reconnect.maxDelayMs ?? 3e4;
   if (maxDelayMs < initialDelayMs) {
@@ -74754,6 +74758,7 @@ function resolveConfig(input4 = {}, env = process.env) {
     enabled: parsed.enabled ?? true,
     role: parsed.role ?? "host",
     ...serverUrl === void 0 ? {} : { serverUrl },
+    ...fallbackServerUrl === void 0 ? {} : { fallbackServerUrl },
     deviceName: parsed.deviceName ?? env.DSH_REMOTE_DEVICE_NAME ?? hostname3(),
     hostControl: { enabled: parsed.hostControl?.enabled ?? true },
     terminal: { enabled: parsed.terminal?.enabled ?? (env.DSH_REMOTE_TERMINAL_ENABLED === void 0 || env.DSH_REMOTE_TERMINAL_ENABLED === "true") },
@@ -74839,7 +74844,7 @@ function normalizeServerUrl(value) {
 }
 
 // src/version.ts
-var PLUGIN_VERSION = "0.6.3-fork.2";
+var PLUGIN_VERSION = "0.6.3-fork.3";
 
 // src/server-api.ts
 var TERMINAL_CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/u;
@@ -86975,7 +86980,7 @@ function isOversizedListing(value) {
 // src/server-connection.ts
 var DEFAULT_WEBRTC_NEGOTIATE_TIMEOUT_MS = 12e3;
 var HostServerConnection = class {
-  constructor(config2, identity3, identities, api, connections, logger2, createWebSocket = (url2) => new WebSocket(url2), rtcFactoryProvider, hostCapabilities = () => [], harnessVersion) {
+  constructor(config2, identity3, identities, api, connections, logger2, createWebSocket = (url2) => new WebSocket(url2), rtcFactoryProvider, hostCapabilities = () => [], harnessVersion, onFailover) {
     this.config = config2;
     this.identity = identity3;
     this.identities = identities;
@@ -86986,6 +86991,7 @@ var HostServerConnection = class {
     this.rtcFactoryProvider = rtcFactoryProvider;
     this.hostCapabilities = hostCapabilities;
     this.harnessVersion = harnessVersion;
+    this.onFailover = onFailover;
   }
   socket;
   running;
@@ -87002,6 +87008,10 @@ var HostServerConnection = class {
   negotiatedCapabilities = ["transport.relay"];
   controlFrameLimits = {};
   webRtcNegotiateTimeoutMs = DEFAULT_WEBRTC_NEGOTIATE_TIMEOUT_MS;
+  /** Consecutive retryable connection failures; used to trigger a server failover. */
+  consecutiveFailures = 0;
+  /** The failover callback has already been requested for this connection. */
+  failoverRequested = false;
   start() {
     if (this.running !== void 0) return;
     this.stopped = false;
@@ -87098,6 +87108,18 @@ var HostServerConnection = class {
           return;
         }
         if (!this.config.reconnect.enabled) return;
+        if (!TERMINAL_AUTH_ERRORS.has(code) && code !== "UNSUPPORTED_VERSION") {
+          this.consecutiveFailures += 1;
+          if (this.consecutiveFailures >= 5 && !this.failoverRequested && this.onFailover !== void 0) {
+            this.failoverRequested = true;
+            this.logger.warn("primary server kept failing; switching to the fallback server");
+            try {
+              this.onFailover();
+            } catch (failoverError) {
+              this.logger.error("fallback server switch failed", { code: errorCode4(failoverError) });
+            }
+          }
+        }
       }
       if (this.stopped) return;
       if (this.reconnectRequested) {
@@ -87185,6 +87207,7 @@ var HostServerConnection = class {
               if (tunnel.lease && !this.negotiatedCapabilities.includes(required2)) await this.dropTunnel(tunnel.connectionId);
             }
             this.online = true;
+            this.consecutiveFailures = 0;
             this.terminalError = void 0;
             this.logger.info("server control connection online", {
               serverVersion: payload.serverVersion,
@@ -88336,7 +88359,7 @@ var HarnessRemoteBridge = class {
     if (TERMINAL_STREAMS.has(params.endpoint)) throw new RpcError("METHOD_NOT_ALLOWED", "Use a stream for this terminal endpoint.");
     if (["settings/update", "settings/replace", "settings/mutate"].includes(params.endpoint)) {
       const args = requestArgs(params.payload);
-      if (args.ns === "ds-harness-remote" || args.ns === "dsh-remote") {
+      if (args.ns === "dsh-agent-remote" || args.ns === "dsh-remote") {
         throw new RpcError("PERMISSION_DENIED", "Remote access settings can only be changed locally on the Host.");
       }
     }
@@ -88565,8 +88588,8 @@ var HarnessRemoteBridge = class {
     if (!result.ok || !Array.isArray(result.value)) throw new RpcError("PERMISSION_DENIED", "Cannot verify the Host plugin inventory.");
     const row = result.value.find((value) => isRecord21(value) && value[plugin ? "entryId" : "name"] === args[key]);
     if (!isRecord21(row) || row.readOnlyReason !== void 0) throw new RpcError("PERMISSION_DENIED", "The Host plugin cannot be changed remotely.");
-    const remoteModule = (value) => typeof value === "string" && /^(?:ds-harness-remote|dsh-remote)(?:\/|$)/.test(value);
-    if (remoteModule(plugin ? row.moduleName : row.name) || !plugin && (!Array.isArray(row.rows) || row.rows.some((value) => !isRecord21(value) || remoteModule(value.moduleName)) || Array.isArray(row.overrides) && row.overrides.some((value) => remoteModule(value) || value === "ds-harness-remote-tui"))) {
+    const remoteModule = (value) => typeof value === "string" && /^(?:dsh-agent-remote|dsh-remote)(?:\/|$)/.test(value);
+    if (remoteModule(plugin ? row.moduleName : row.name) || !plugin && (!Array.isArray(row.rows) || row.rows.some((value) => !isRecord21(value) || remoteModule(value.moduleName)) || Array.isArray(row.overrides) && row.overrides.some((value) => remoteModule(value) || value === "dsh-agent-remote-tui"))) {
       throw new RpcError("PERMISSION_DENIED", "The Remote plugin can only be enabled or disabled locally on the Host.");
     }
   }
@@ -89023,7 +89046,7 @@ function filterSessionListProjections(resultOrEndpoint, maybeResult) {
 }
 function filterRemotePluginInventory(endpoint, result) {
   if (!result.ok) return result;
-  const isRemote = (value) => typeof value === "string" && /^(?:ds-harness-remote|dsh-remote)(?:\/|$)/.test(value);
+  const isRemote = (value) => typeof value === "string" && /^(?:dsh-agent-remote|dsh-remote)(?:\/|$)/.test(value);
   const filterEntries = (entries) => entries.filter((entry) => !isRecord21(entry) || !isRemote(entry.moduleName));
   if (endpoint === "pluginManager/listPlugins" && Array.isArray(result.value)) {
     return { ...result, value: filterEntries(result.value) };
@@ -89155,6 +89178,7 @@ var HostPluginRuntime = class {
   serverConnection;
   harnessVersion;
   closed = false;
+  failoverInFlight = false;
   codex;
   acp;
   codexWorkspaceState = new WorkspaceBridgeState((key) => TerminalPolicy.releaseOwner(this.terminalOwners, key));
@@ -89435,8 +89459,43 @@ var HostPluginRuntime = class {
         iceIpv6: this.config.iceIpv6
       }),
       () => this.hostCapabilities(),
-      this.harnessVersion
+      this.harnessVersion,
+      () => this.switchToFallbackServer()
     );
+  }
+  /**
+   * Switch the Host to `fallbackServerUrl` after the primary server keeps failing.
+   * Rebuilds the server API (credentials are stored per server origin) and
+   * restarts the control connection; no-op when no fallback is configured.
+   */
+  switchToFallbackServer() {
+    const fallbackUrl = this.config.fallbackServerUrl;
+    if (fallbackUrl === void 0 || this.config.serverUrl === fallbackUrl) return;
+    if (this.closed || this.failoverInFlight) return;
+    this.failoverInFlight = true;
+    void (async () => {
+      try {
+        this.logger.warn("switching Host connection to the fallback server", {
+          from: this.config.serverUrl ?? "(unset)",
+          to: fallbackUrl
+        });
+        const previous = this.serverConnection;
+        this.serverConnection = void 0;
+        await previous?.stop().catch(() => void 0);
+        const identity3 = this.identity;
+        if (identity3 === void 0 || this.closed) return;
+        this.serverApi = new HostServerApi(fallbackUrl, new ServerCredentialStore(this.identities.directory));
+        this.config.serverUrl = fallbackUrl;
+        this.serverConnection = this.createServerConnection(identity3);
+        this.serverConnection.start();
+      } catch (error62) {
+        this.logger.error("fallback server switch failed", {
+          message: error62 instanceof Error ? error62.message : String(error62)
+        });
+      } finally {
+        this.failoverInFlight = false;
+      }
+    })();
   }
   async readHarnessVersion() {
     const version2 = await readHarnessDistributionVersion();
@@ -89778,7 +89837,7 @@ ${helpText()}`);
 }
 async function register(args, runtime) {
   if (args.length !== 1 || args[0] === void 0 || args[0].trim() === "") {
-    throw new CliUsageError("Usage: ds-harness-remote register <server-token>");
+    throw new CliUsageError("Usage: dsh-agent-remote register <server-token>");
   }
   const context = await hostContext(runtime);
   await context.api.authorizeHostWithCode(context.identity, args[0]);
@@ -89786,20 +89845,20 @@ async function register(args, runtime) {
   return 0;
 }
 async function login(args, runtime) {
-  if (args.length > 1) throw new CliUsageError("Usage: ds-harness-remote login [provider|list]");
+  if (args.length > 1) throw new CliUsageError("Usage: dsh-agent-remote login [provider|list]");
   const context = await hostContext(runtime);
   const providers = (await context.api.oauthProviders()).filter((item) => item.qrStartUrl != null);
   if (args[0] === "list") {
-    write(runtime.stdout, providers.length === 0 ? "No QR sign-in providers are available.\n" : providers.map((item) => `${item.displayName}: ds-harness-remote login ${item.id}
+    write(runtime.stdout, providers.length === 0 ? "No QR sign-in providers are available.\n" : providers.map((item) => `${item.displayName}: dsh-agent-remote login ${item.id}
 `).join(""));
     return 0;
   }
   const selected = args[0] === void 0 ? providers.find((item) => item.id === "zhihu") ?? providers[0] : providers.find((item) => item.id === args[0]);
-  if (selected === void 0) throw new CliUsageError('OAuth provider unavailable. Run "ds-harness-remote login list" to see available providers.');
+  if (selected === void 0) throw new CliUsageError('OAuth provider unavailable. Run "dsh-agent-remote login list" to see available providers.');
   const provider = selected.id;
   const session2 = await context.api.startOAuthQrLogin(provider);
   const qr = await runtime.renderQr(session2.scanUrl);
-  write(runtime.stdout, `Using ${selected.displayName} QR login. Run "ds-harness-remote login list" for available providers.
+  write(runtime.stdout, `Using ${selected.displayName} QR login. Run "dsh-agent-remote login list" for available providers.
 `);
   write(runtime.stdout, "Scan this QR code to authorize this Host:\n\n");
   write(runtime.stdout, `${qr.trimEnd()}
@@ -89834,7 +89893,7 @@ Waiting for authorization...
   return 1;
 }
 async function status(args, runtime) {
-  if (args.length !== 0) throw new CliUsageError("Usage: ds-harness-remote status");
+  if (args.length !== 0) throw new CliUsageError("Usage: dsh-agent-remote status");
   const serverUrl = selectedServer();
   const root = new IdentityStore({ env: runtime.env }).directory;
   const directory = serverStorageDirectory(root, serverUrl, "host");
@@ -89847,7 +89906,7 @@ async function status(args, runtime) {
     lines.push("Device: not initialized", "Authorization: logged out", "Credential: unavailable");
     write(runtime.stdout, `${lines.join("\n")}
 
-Run "ds-harness-remote login" or use "/remote login" in dsh-TUI.
+Run "dsh-agent-remote login" or use "/remote login" in dsh-TUI.
 `);
     return 0;
   }
@@ -89861,7 +89920,7 @@ Run "ds-harness-remote login" or use "/remote login" in dsh-TUI.
     lines.push("Authorization: logged out", "Credential: unavailable");
     write(runtime.stdout, `${lines.join("\n")}
 
-Run "ds-harness-remote login" or use "/remote login" in dsh-TUI.
+Run "dsh-agent-remote login" or use "/remote login" in dsh-TUI.
 `);
     return 0;
   }
@@ -89884,7 +89943,7 @@ Run "ds-harness-remote login" or use "/remote login" in dsh-TUI.
   }
 }
 async function logout(args, runtime) {
-  if (args.length !== 0) throw new CliUsageError("Usage: ds-harness-remote logout");
+  if (args.length !== 0) throw new CliUsageError("Usage: dsh-agent-remote logout");
   const serverUrl = selectedServer();
   const root = new IdentityStore({ env: runtime.env }).directory;
   const directory = serverStorageDirectory(root, serverUrl, "host");
@@ -89993,10 +90052,10 @@ function cliErrorMessage(error62) {
 function helpText() {
   return [
     "Usage:",
-    "  ds-harness-remote login [provider|list]",
-    "  ds-harness-remote register <server-token>",
-    "  ds-harness-remote status",
-    "  ds-harness-remote logout",
+    "  dsh-agent-remote login [provider|list]",
+    "  dsh-agent-remote register <server-token>",
+    "  dsh-agent-remote status",
+    "  dsh-agent-remote logout",
     "",
     "Inside dsh-TUI, use /remote login, /remote status, or /remote logout.",
     "login uses an available QR provider (preferring Zhihu). Use login list to see available providers.",
@@ -90473,8 +90532,8 @@ function runHmrSafe(run, hmr) {
 
 // src/update-check.ts
 var DIST_TAG_URLS = [
-  "https://registry.npmjs.org/-/package/ds-harness-remote/dist-tags",
-  "https://registry.npmmirror.com/-/package/ds-harness-remote/dist-tags"
+  "https://registry.npmjs.org/-/package/dsh-agent-remote/dist-tags",
+  "https://registry.npmmirror.com/-/package/dsh-agent-remote/dist-tags"
 ];
 var FETCH_TIMEOUT_MS = 1e4;
 var RECHECK_INTERVAL_MS = 24 * 60 * 60 * 1e3;
@@ -91384,11 +91443,11 @@ var AcpGateway = class {
 };
 
 // src/index.ts
-var name = "ds-harness-remote";
+var name = "dsh-agent-remote";
 var legacyLoaderModuleNames = /* @__PURE__ */ new Set(["dsh-remote", "@dsh-remote/plugin"]);
-var pluginSettingsNamespace = "ds-harness-remote";
+var pluginSettingsNamespace = "dsh-agent-remote";
 var legacySettingsNamespace = "dsh-remote";
-var DEFAULT_ENTRY_ID = "ds-harness-remote";
+var DEFAULT_ENTRY_ID = "dsh-agent-remote";
 var INCLUDE_ENTRY_PREFIX = "include:";
 function apply(ctx, entry = void 0) {
   const readConfig = () => readEntryConfig(entry);
@@ -91398,7 +91457,7 @@ function apply(ctx, entry = void 0) {
     if (isLegacySettingsProvider(settings)) return;
     settingsContext.effect(() => settings.configure({ auto: false }, ctx.fiber));
   });
-  const tuiEntry = entryId === "ds-harness-remote-tui";
+  const tuiEntry = entryId === "dsh-agent-remote-tui";
   const tuiCommandsAvailable = ctx.get("commands", false) !== void 0 && (tuiEntry || ctx.get("tuiScenes", false) !== void 0);
   const tuiBinding = tuiCommandsAvailable ? {} : void 0;
   if (tuiBinding !== void 0) installTuiRemoteCommand(ctx, () => tuiBinding.target);

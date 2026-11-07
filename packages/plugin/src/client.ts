@@ -50,7 +50,7 @@ declare const DSH_REMOTE_CLIENT_MODULE_ID: string | undefined
 
 const clientModuleId = typeof DSH_REMOTE_CLIENT_MODULE_ID === 'string'
   ? DSH_REMOTE_CLIENT_MODULE_ID
-  : 'ds-harness-remote'
+  : 'dsh-agent-remote'
 const controlRouteBackoffStepsMs = [1_000, 2_000, 5_000, 10_000, 30_000] as const
 
 class ControlRouteUnavailableError extends Error {
@@ -327,10 +327,10 @@ window.__ModuleLoader__.load({
       if (window.__DS_HARNESS_REMOTE_CLIENT_ACTIVE__) return
       window.__DS_HARNESS_REMOTE_CLIENT_ACTIVE__ = true
       readyPluginSessions(ctx.sessions)
-      ctx.effect(() => () => { window.__DS_HARNESS_REMOTE_CLIENT_ACTIVE__ = false }, 'ds-harness-remote: client singleton')
+      ctx.effect(() => () => { window.__DS_HARNESS_REMOTE_CLIENT_ACTIVE__ = false }, 'dsh-agent-remote: client singleton')
       ctx.effect(() => () => {
         if (pluginRouteFetch !== undefined && window.fetch === pluginRouteFetch) window.fetch = originalPluginFetch
-      }, 'ds-harness-remote: plugin route fetch')
+      }, 'dsh-agent-remote: plugin route fetch')
 
       const t = ctx.locale.bind(localeNamespace)
       const remoteOpenListeners = new Set<() => void>()
@@ -383,10 +383,10 @@ window.__ModuleLoader__.load({
         url: STATUS_STREAM_PATH.slice(1),
         readStatus: () => control<RemoteStatus>('status'),
         onFallback: reason => {
-          console.warn('ds-harness-remote: status event stream unavailable, polling status instead:', reason)
+          console.warn('dsh-agent-remote: status event stream unavailable, polling status instead:', reason)
         },
       })
-      ctx.effect(() => () => statusFeed.close(), 'ds-harness-remote: status stream')
+      ctx.effect(() => () => statusFeed.close(), 'dsh-agent-remote: status stream')
       ctx.effect(() => {
         const unsubscribe = statusFeed.subscribe(status => {
           document.documentElement.classList.toggle('dshRemoteBrowserUnavailable', status.mode === 'remote')
@@ -395,8 +395,8 @@ window.__ModuleLoader__.load({
           unsubscribe()
           document.documentElement.classList.remove('dshRemoteBrowserUnavailable')
         }
-      }, 'ds-harness-remote: hide local browser entry in remote mode')
-      ctx.effect(() => subscribeRemoteRecovery(statusFeed, () => ctx.connection.reconnect?.()), 'ds-harness-remote: carrier recovery')
+      }, 'dsh-agent-remote: hide local browser entry in remote mode')
+      ctx.effect(() => subscribeRemoteRecovery(statusFeed, () => ctx.connection.reconnect?.()), 'dsh-agent-remote: carrier recovery')
       ctx.effect(() => {
         let disposed = false
         let unsubscribeWorkspaces: (() => void) | undefined
@@ -467,7 +467,7 @@ window.__ModuleLoader__.load({
           unsubscribeWorkspaces?.()
           unsubscribeSessions?.()
         }
-      }, 'ds-harness-remote: resume selected workspace')
+      }, 'dsh-agent-remote: resume selected workspace')
       ctx.inject(['fileViewer'], fileViewerContext => {
         const viewer = fileViewerContext.get<FileViewerClientServiceLike>('fileViewer')
         if (viewer === undefined) return
@@ -498,7 +498,7 @@ window.__ModuleLoader__.load({
             unsubscribe()
             unregister?.()
           }
-        }, 'ds-harness-remote: remote file viewer provider')
+        }, 'dsh-agent-remote: remote file viewer provider')
       })
       // Add Remote Hosts as an @ mention source through Harness' input-trigger
       // service. The source owns only discovery and target switching; it never
@@ -577,21 +577,21 @@ window.__ModuleLoader__.load({
             document.removeEventListener('click', stopHostFileOpen, true)
             unregister()
           }
-        }, 'ds-harness-remote: host mention source')
+        }, 'dsh-agent-remote: host mention source')
       })
-      ctx.effect(() => ctx.locale.register(localeNamespace, { zh, en }), 'ds-harness-remote: dictionaries')
-      ctx.effect(() => installStyle(clientModuleId), 'ds-harness-remote: client styles')
-      ctx.effect(() => installTerminalAvailabilityNotice(statusFeed, t), 'ds-harness-remote: terminal availability notice')
+      ctx.effect(() => ctx.locale.register(localeNamespace, { zh, en }), 'dsh-agent-remote: dictionaries')
+      ctx.effect(() => installStyle(clientModuleId), 'dsh-agent-remote: client styles')
+      ctx.effect(() => installTerminalAvailabilityNotice(statusFeed, t), 'dsh-agent-remote: terminal availability notice')
       ctx.slots.inject('shell.overlay', () => ctx.slots.register({
         name: 'shell.overlay',
-        id: 'ds-harness-remote-global-context',
+        id: 'dsh-agent-remote-global-context',
         order: 20,
         locale: localeNamespace,
         inject: () => ({ control, statusFeed }),
       }, RemoteSessionHeaderAction))
       ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
         name: 'sidebar.footer.action',
-        id: 'ds-harness-remote-workspace',
+        id: 'dsh-agent-remote-workspace',
         order: -20,
         locale: localeNamespace,
         inject: () => ({
@@ -610,10 +610,10 @@ window.__ModuleLoader__.load({
       // reads as an official plugin) — a bundle's configuration belongs in the
       // two config slots below instead.
       // Row-scoped: keyed `<package>#<row id>` from the bundle's own patch
-      // (`cordis.patch.yml` row `ds-harness-remote`).
+      // (`cordis.patch.yml` row `dsh-agent-remote`).
       ctx.slots.inject('plugins.row.config', () => ctx.slots.register({
         name: 'plugins.row.config',
-        key: 'ds-harness-remote#ds-harness-remote',
+        key: 'dsh-agent-remote#dsh-agent-remote',
         locale: localeNamespace,
         inject: () => ({
           control,
@@ -627,7 +627,7 @@ window.__ModuleLoader__.load({
       // package name.
       ctx.slots.inject('plugins.bundle.config', () => ctx.slots.register({
         name: 'plugins.bundle.config',
-        key: 'ds-harness-remote',
+        key: 'dsh-agent-remote',
         locale: localeNamespace,
         inject: () => ({
           control,

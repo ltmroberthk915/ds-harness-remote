@@ -1632,7 +1632,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
   }
 
   // src/client-locale.ts
-  var localeNamespace = "ds-harness-remote", en = {
+  var localeNamespace = "dsh-agent-remote", en = {
     remoteTools: "Inject Remote Tools",
     remoteToolsHint: "Expose remote_* tools in sessions. On by default; turn it off when you do not need them. Changes apply after restarting the Host.",
     remoteToolsSaved: "Remote Tools setting saved.",
@@ -1649,14 +1649,14 @@ Minimum version required to store current data is: ` + bestVersion + `.
     previewPort: "Host port",
     previewLocalOnly: "Preview requires Desktop or a browser connected to Harness on this computer.",
     settings: "Settings",
-    pluginTitle: "DeepSeek Remote",
+    pluginTitle: "Agent Remote",
     pluginDescription: "P2P-based, end-to-end encrypted remote access to DeepSeek Harness, CodeX, Claude Code, Pi, and other workspaces from web and mobile clients.",
     expandSettings: "Show settings: {name}",
     collapseSettings: "Hide settings: {name}",
     unsaved: "Unsaved",
     associated: "Authorized",
     authorizationComplete: "Authorization complete",
-    loadingSettings: "Loading DeepSeek Remote settings\u2026",
+    loadingSettings: "Loading Agent Remote settings\u2026",
     mode: "Mode",
     pluginMode: "Plugin mode",
     host: "Host",
@@ -3969,7 +3969,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
                 React.createElement("strong", null, selectedHost?.name ?? t("remoteTitle")),
                 selectedHost === void 0 ? React.createElement("a", {
                   className: "dshRemoteStarLink",
-                  href: "https://github.com/liguobao/ds-harness-remote",
+                  href: "https://github.com/liguobao/dsh-agent-remote",
                   target: "_blank",
                   rel: "noreferrer"
                 }, t("starProject")) : null
@@ -4019,7 +4019,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
                   React.createElement(
                     "a",
                     {
-                      href: "https://github.com/liguobao/ds-harness-remote",
+                      href: "https://github.com/liguobao/dsh-agent-remote",
                       target: "_blank",
                       rel: "noopener noreferrer"
                     },
@@ -4261,7 +4261,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
                     React.createElement("span", null, status?.target?.name ?? status?.deviceName ?? status?.host?.account ?? t("account")),
                     updateNotice === void 0 ? null : React.createElement("a", {
                       className: "dshRemoteAccountUpdate",
-                      href: "https://github.com/liguobao/ds-harness-remote/releases",
+                      href: "https://github.com/liguobao/dsh-agent-remote/releases",
                       target: "_blank",
                       rel: "noreferrer",
                       title: updateNotice
@@ -5107,7 +5107,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
   }
 
   // src/client.ts
-  var clientModuleId = "ds-harness-remote", controlRouteBackoffStepsMs = [1e3, 2e3, 5e3, 1e4, 3e4], ControlRouteUnavailableError = class extends Error {
+  var clientModuleId = "dsh-agent-remote", controlRouteBackoffStepsMs = [1e3, 2e3, 5e3, 1e4, 3e4], ControlRouteUnavailableError = class extends Error {
     constructor(message) {
       super(message), this.name = "ControlRouteUnavailableError";
     }
@@ -5303,9 +5303,9 @@ Minimum version required to store current data is: ` + bestVersion + `.
         if (window.__DS_HARNESS_REMOTE_CLIENT_ACTIVE__) return;
         window.__DS_HARNESS_REMOTE_CLIENT_ACTIVE__ = !0, readyPluginSessions(ctx.sessions), ctx.effect(() => () => {
           window.__DS_HARNESS_REMOTE_CLIENT_ACTIVE__ = !1;
-        }, "ds-harness-remote: client singleton"), ctx.effect(() => () => {
+        }, "dsh-agent-remote: client singleton"), ctx.effect(() => () => {
           pluginRouteFetch !== void 0 && window.fetch === pluginRouteFetch && (window.fetch = originalPluginFetch);
-        }, "ds-harness-remote: plugin route fetch");
+        }, "dsh-agent-remote: plugin route fetch");
         let t = ctx.locale.bind(localeNamespace), remoteOpenListeners = /* @__PURE__ */ new Set(), openRemote = () => {
           for (let listener of remoteOpenListeners) listener();
         }, subscribeOpen = (listener) => (remoteOpenListeners.add(listener), () => {
@@ -5338,17 +5338,17 @@ Minimum version required to store current data is: ` + bestVersion + `.
           url: STATUS_STREAM_PATH.slice(1),
           readStatus: () => control("status"),
           onFallback: (reason) => {
-            console.warn("ds-harness-remote: status event stream unavailable, polling status instead:", reason);
+            console.warn("dsh-agent-remote: status event stream unavailable, polling status instead:", reason);
           }
         });
-        ctx.effect(() => () => statusFeed.close(), "ds-harness-remote: status stream"), ctx.effect(() => {
+        ctx.effect(() => () => statusFeed.close(), "dsh-agent-remote: status stream"), ctx.effect(() => {
           let unsubscribe = statusFeed.subscribe((status) => {
             document.documentElement.classList.toggle("dshRemoteBrowserUnavailable", status.mode === "remote");
           });
           return () => {
             unsubscribe(), document.documentElement.classList.remove("dshRemoteBrowserUnavailable");
           };
-        }, "ds-harness-remote: hide local browser entry in remote mode"), ctx.effect(() => subscribeRemoteRecovery(statusFeed, () => ctx.connection.reconnect?.()), "ds-harness-remote: carrier recovery"), ctx.effect(() => {
+        }, "dsh-agent-remote: hide local browser entry in remote mode"), ctx.effect(() => subscribeRemoteRecovery(statusFeed, () => ctx.connection.reconnect?.()), "dsh-agent-remote: carrier recovery"), ctx.effect(() => {
           let disposed = !1, unsubscribeWorkspaces, unsubscribeSessions, selection, opening = !1, reconcile = () => {
             if (disposed || opening || selection === void 0) return;
             let pending = selection, workspaceSnapshot = ctx.workspaces.list.getSnapshot();
@@ -5381,7 +5381,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
           }), () => {
             disposed = !0, unsubscribeWorkspaces?.(), unsubscribeSessions?.();
           };
-        }, "ds-harness-remote: resume selected workspace"), ctx.inject(["fileViewer"], (fileViewerContext) => {
+        }, "dsh-agent-remote: resume selected workspace"), ctx.inject(["fileViewer"], (fileViewerContext) => {
           let viewer = fileViewerContext.get("fileViewer");
           viewer !== void 0 && fileViewerContext.effect(() => {
             let unregister, latestSaveAsAllowed = !1, latestSaveAsMaxBytes = REMOTE_FILE_SAVE_AS_MAX_BYTES, unsubscribe = statusFeed.subscribe((status) => {
@@ -5394,7 +5394,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
             return () => {
               unsubscribe(), unregister?.();
             };
-          }, "ds-harness-remote: remote file viewer provider");
+          }, "dsh-agent-remote: remote file viewer provider");
         });
         let RemoteMentionIcon = (props) => React.createElement(
           "svg",
@@ -5454,16 +5454,16 @@ Minimum version required to store current data is: ` + bestVersion + `.
             return () => {
               document.removeEventListener("click", stopHostFileOpen, !0), unregister();
             };
-          }, "ds-harness-remote: host mention source");
-        }), ctx.effect(() => ctx.locale.register(localeNamespace, { zh, en }), "ds-harness-remote: dictionaries"), ctx.effect(() => installStyle(clientModuleId), "ds-harness-remote: client styles"), ctx.effect(() => installTerminalAvailabilityNotice(statusFeed, t), "ds-harness-remote: terminal availability notice"), ctx.slots.inject("shell.overlay", () => ctx.slots.register({
+          }, "dsh-agent-remote: host mention source");
+        }), ctx.effect(() => ctx.locale.register(localeNamespace, { zh, en }), "dsh-agent-remote: dictionaries"), ctx.effect(() => installStyle(clientModuleId), "dsh-agent-remote: client styles"), ctx.effect(() => installTerminalAvailabilityNotice(statusFeed, t), "dsh-agent-remote: terminal availability notice"), ctx.slots.inject("shell.overlay", () => ctx.slots.register({
           name: "shell.overlay",
-          id: "ds-harness-remote-global-context",
+          id: "dsh-agent-remote-global-context",
           order: 20,
           locale: localeNamespace,
           inject: () => ({ control, statusFeed })
         }, RemoteSessionHeaderAction)), ctx.slots.inject("sidebar.footer.action", () => ctx.slots.register({
           name: "sidebar.footer.action",
-          id: "ds-harness-remote-workspace",
+          id: "dsh-agent-remote-workspace",
           order: -20,
           locale: localeNamespace,
           inject: () => ({
@@ -5477,7 +5477,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
           })
         }, RemoteWorkspaceAction)), ctx.slots.inject("plugins.row.config", () => ctx.slots.register({
           name: "plugins.row.config",
-          key: "ds-harness-remote#ds-harness-remote",
+          key: "dsh-agent-remote#dsh-agent-remote",
           locale: localeNamespace,
           inject: () => ({
             control,
@@ -5488,7 +5488,7 @@ Minimum version required to store current data is: ` + bestVersion + `.
           })
         }, RemotePluginOptions)), ctx.slots.inject("plugins.bundle.config", () => ctx.slots.register({
           name: "plugins.bundle.config",
-          key: "ds-harness-remote",
+          key: "dsh-agent-remote",
           locale: localeNamespace,
           inject: () => ({
             control,

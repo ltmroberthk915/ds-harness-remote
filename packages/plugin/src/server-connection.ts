@@ -104,6 +104,10 @@ export class HostServerConnection {
   private negotiatedCapabilities: string[] = ['transport.relay']
   private controlFrameLimits: ControlFrameByteLimits = {}
   private webRtcNegotiateTimeoutMs = DEFAULT_WEBRTC_NEGOTIATE_TIMEOUT_MS
+  /** Consecutive retryable connection failures; used to trigger a server failover. */
+  private consecutiveFailures = 0
+  /** The failover callback has already been requested for this connection. */
+  private failoverRequested = false
 
   constructor(
     private readonly config: ResolvedConfig,
@@ -116,6 +120,7 @@ export class HostServerConnection {
     private readonly rtcFactoryProvider?: () => Promise<RtcPeerConnectionFactory | undefined>,
     private readonly hostCapabilities: () => readonly string[] = () => [],
     private readonly harnessVersion?: string,
+    private readonly onFailover?: () => void,
   ) {}
 
   start(): void {
@@ -212,6 +217,14 @@ export class HostServerConnection {
         }
         if (TERMINAL_AUTH_ERRORS.has(code) || code === 'UNSUPPORTED_VERSION') { await this.dropTunnels(); return }
         if (!this.config.reconnect.enabled) return
+          if (!TERMINAL_AUTH_ERRORS.has(code) && code !== 'UNSUPPORTED_VERSION') {
+            this.consecutiveFailures += 1
+            if (this.consecutiveFailures >= 5 && !this.failoverRequested && this.onFailover !== undefined) {
+              this.failoverRequested = true
+              this.logger.warn('primary server kept failing; switching to the fallback server')
+              try { this.onFailover() } catch (failoverError) { this.logger.error('fallback server switch failed', { code: errorCode(failoverError) }) }
+            }
+          }
       }
       if (this.stopped) return
       if (this.reconnectRequested) {
@@ -313,6 +326,7 @@ export class HostServerConnection {
               if (tunnel.lease && !this.negotiatedCapabilities.includes(required)) await this.dropTunnel(tunnel.connectionId)
             }
             this.online = true
+              this.consecutiveFailures = 0
             this.terminalError = undefined
             this.logger.info('server control connection online', {
               serverVersion: payload.serverVersion,

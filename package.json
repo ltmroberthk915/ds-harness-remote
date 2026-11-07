@@ -1,6 +1,6 @@
 {
-  "name": "ds-harness-remote",
-  "version": "0.6.3-fork.2",
+  "name": "dsh-agent-remote",
+  "version": "0.6.3-fork.3",
   "description": "P2P-based, end-to-end encrypted remote access to DeepSeek Harness, CodeX, Claude Code, Pi, and other workspaces from web and mobile clients.",
   "keywords": [
     "deepseek",
@@ -25,7 +25,7 @@
   "type": "module",
   "main": "./index.js",
   "bin": {
-    "ds-harness-remote": "./packages/plugin/bin/ds-harness-remote.js"
+    "dsh-agent-remote": "./packages/plugin/bin/dsh-agent-remote.js"
   },
   "types": "./packages/plugin/public.d.ts",
   "exports": {
@@ -43,7 +43,7 @@
     "index.js",
     "packages/plugin/dist/index.js",
     "packages/plugin/dist/client.github.js",
-    "packages/plugin/bin/ds-harness-remote.js",
+    "packages/plugin/bin/dsh-agent-remote.js",
     "packages/plugin/public.d.ts",
     "packages/plugin/LICENSE",
     "dsh-plugin.json",

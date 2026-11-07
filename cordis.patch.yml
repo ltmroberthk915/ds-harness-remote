@@ -2,8 +2,8 @@
 # the root and point it at the package/plugin id so DSH Desktop can recognize
 # and load the repository directly as a bundle.
 - insert:
-    - id: ds-harness-remote
-      name: ds-harness-remote
+    - id: dsh-agent-remote
+      name: dsh-agent-remote
       inject:
         - webServer
       # dsh-TUI needs a scoped entry with explicit command/scene injects.
@@ -20,8 +20,8 @@
         codex:
           enabled: true
           binary: codex
-    - id: ds-harness-remote-tui
-      name: ds-harness-remote
+    - id: dsh-agent-remote-tui
+      name: dsh-agent-remote
       # The TUI command registry is the only required terminal service. The
       # completion tree and full-screen scene registries are optional seams;
       # the plugin resolves them with ctx.get() and falls back to inline

@@ -67,10 +67,11 @@ export class HostPluginRuntime {
   private terminalEnabled: boolean
   private loopbackPorts: readonly number[]
   private identity?: HostIdentity
-  private readonly serverApi?: HostServerApi
+  private serverApi?: HostServerApi
   private serverConnection?: HostServerConnection
   private harnessVersion?: string
   private closed = false
+  private failoverInFlight = false
   private readonly codex: CodexRemoteDomain
   private readonly acp: AcpRemoteGateway
   private readonly codexWorkspaceState = new CodexWorkspaceState(key => TerminalPolicy.releaseOwner(this.terminalOwners, key))
@@ -80,7 +81,7 @@ export class HostPluginRuntime {
   private localAcpPublish: PublishAcpFrame = async () => undefined
 
   constructor(
-    private readonly config: ResolvedConfig,
+    private config: ResolvedConfig,
     private readonly identities: IdentityStore,
     private readonly logger: SafeLogger,
     private readonly localGateway?: LocalTypertGateway,
@@ -469,7 +470,43 @@ export class HostPluginRuntime {
           }),
       () => this.hostCapabilities(),
       this.harnessVersion,
+        () => this.switchToFallbackServer(),
     )
+  }
+
+  /**
+   * Switch the Host to `fallbackServerUrl` after the primary server keeps failing.
+   * Rebuilds the server API (credentials are stored per server origin) and
+   * restarts the control connection; no-op when no fallback is configured.
+   */
+  private switchToFallbackServer(): void {
+    const fallbackUrl = this.config.fallbackServerUrl
+    if (fallbackUrl === undefined || this.config.serverUrl === fallbackUrl) return
+    if (this.closed || this.failoverInFlight) return
+    this.failoverInFlight = true
+    void (async () => {
+      try {
+        this.logger.warn('switching Host connection to the fallback server', {
+          from: this.config.serverUrl ?? '(unset)',
+          to: fallbackUrl,
+        })
+        const previous = this.serverConnection
+        this.serverConnection = undefined
+        await previous?.stop().catch(() => undefined)
+        const identity = this.identity
+        if (identity === undefined || this.closed) return
+        this.serverApi = new HostServerApi(fallbackUrl, new ServerCredentialStore(this.identities.directory))
+        this.config.serverUrl = fallbackUrl
+        this.serverConnection = this.createServerConnection(identity)
+        this.serverConnection.start()
+      } catch (error) {
+        this.logger.error('fallback server switch failed', {
+          message: error instanceof Error ? error.message : String(error),
+        })
+      } finally {
+        this.failoverInFlight = false
+      }
+    })()
   }
 
   private async readHarnessVersion(): Promise<string | undefined> {

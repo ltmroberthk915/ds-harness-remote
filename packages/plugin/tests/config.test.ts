@@ -81,6 +81,13 @@ describe('plugin config', () => {
     expect(normalizeServerUrl('https://REMOTE.example.com/')).toBe('https://remote.example.com')
   })
 
+  it('parses an optional fallback server and keeps it absent by default', () => {
+    expect(resolveConfig({}, {}).fallbackServerUrl).toBeUndefined()
+    expect(resolveConfig({ fallbackServerUrl: 'https://backup.example.com' }).fallbackServerUrl)
+      .toBe('https://backup.example.com')
+    expect(() => resolveConfig({ fallbackServerUrl: 'http://remote.example.com' })).toThrow(/HTTPS/)
+    expect(() => resolveConfig({ fallbackServerUrl: 'https://remote.example.com/path' })).toThrow(/without a path/)
+  })
   it('rejects an inverted reconnect range', () => {
     expect(() => resolveConfig({ reconnect: { initialDelayMs: 5_000, maxDelayMs: 1_000 } })).toThrow(/maxDelayMs/)
   })

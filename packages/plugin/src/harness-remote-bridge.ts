@@ -242,7 +242,7 @@ export class HarnessRemoteBridge {
     if (TERMINAL_STREAMS.has(params.endpoint)) throw new RpcError('METHOD_NOT_ALLOWED', 'Use a stream for this terminal endpoint.')
     if (['settings/update', 'settings/replace', 'settings/mutate'].includes(params.endpoint)) {
       const args = requestArgs(params.payload)
-      if (args.ns === 'ds-harness-remote' || args.ns === 'dsh-remote') {
+      if (args.ns === 'dsh-agent-remote' || args.ns === 'dsh-remote') {
         throw new RpcError('PERMISSION_DENIED', 'Remote access settings can only be changed locally on the Host.')
       }
     }
@@ -498,10 +498,10 @@ export class HarnessRemoteBridge {
     const row = result.value.find(value => isRecord(value) && value[plugin ? 'entryId' : 'name'] === args[key])
     if (!isRecord(row) || row.readOnlyReason !== undefined) throw new RpcError('PERMISSION_DENIED', 'The Host plugin cannot be changed remotely.')
     const remoteModule = (value: unknown): boolean => typeof value === 'string'
-      && /^(?:ds-harness-remote|dsh-remote)(?:\/|$)/.test(value)
+      && /^(?:dsh-agent-remote|dsh-remote)(?:\/|$)/.test(value)
     if (remoteModule(plugin ? row.moduleName : row.name)
       || (!plugin && (!Array.isArray(row.rows) || row.rows.some(value => !isRecord(value) || remoteModule(value.moduleName))
-        || (Array.isArray(row.overrides) && row.overrides.some(value => remoteModule(value) || value === 'ds-harness-remote-tui'))))) {
+        || (Array.isArray(row.overrides) && row.overrides.some(value => remoteModule(value) || value === 'dsh-agent-remote-tui'))))) {
       throw new RpcError('PERMISSION_DENIED', 'The Remote plugin can only be enabled or disabled locally on the Host.')
     }
   }
@@ -1057,7 +1057,7 @@ export function filterSessionListProjections(
 function filterRemotePluginInventory(endpoint: string, result: TypertRpcResult): TypertRpcResult {
   if (!result.ok) return result
   const isRemote = (value: unknown): boolean => typeof value === 'string'
-    && /^(?:ds-harness-remote|dsh-remote)(?:\/|$)/.test(value)
+    && /^(?:dsh-agent-remote|dsh-remote)(?:\/|$)/.test(value)
   const filterEntries = (entries: unknown[]): unknown[] => entries.filter(entry =>
     !isRecord(entry) || !isRemote(entry.moduleName))
   if (endpoint === 'pluginManager/listPlugins' && Array.isArray(result.value)) {
