@@ -1,6 +1,6 @@
 {
   "name": "@dsh-remote/android",
-  "version": "0.6.3-fork.1",
+  "version": "0.6.3-fork.2",
   "type": "module",
   "main": "index.ts",
   "dependencies": {
