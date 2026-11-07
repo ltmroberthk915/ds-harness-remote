@@ -56277,22 +56277,6 @@ function parseWireJson(input4) {
   }
 }
 
-// ../protocol/dist/close-semantics.js
-var SERVER_SHUTDOWN_REASON = "server shutdown";
-var SERVER_SHUTDOWN_CLOSE_CODES = [4009, 4001, 1013];
-var HEARTBEAT_TIMEOUT_CLOSE_CODE = 4009;
-var HEARTBEAT_TIMEOUT_REASON = "heartbeat timeout";
-var HEARTBEAT_CONNECTION_FAILED_REASON = "CONNECTION_FAILED";
-function normalizeReason(reason) {
-  return typeof reason === "string" ? reason.trim() : "";
-}
-function isServerShutdownClose(code, reason) {
-  return SERVER_SHUTDOWN_CLOSE_CODES.includes(code) && normalizeReason(reason) === SERVER_SHUTDOWN_REASON;
-}
-function isHeartbeatTimeoutClose(code, reason) {
-  return code === HEARTBEAT_TIMEOUT_CLOSE_CODE && normalizeReason(reason) === HEARTBEAT_TIMEOUT_REASON || code === 4001 && normalizeReason(reason) === HEARTBEAT_CONNECTION_FAILED_REASON;
-}
-
 // ../protocol/dist/index.js
 var WEBRTC_RESUME_CAPABILITY = "transport.webrtc.resume.v1";
 var RELAY_RESUME_CAPABILITY = "transport.relay.resume.v1";
@@ -56709,10 +56693,7 @@ var signalIcePayloadSchema = external_exports.object({
 var transportSelectedPayloadSchema = external_exports.object({
   connectionId: external_exports.string().min(1),
   targetDeviceId: external_exports.string().min(1),
-  transport: selectedTransportEnum,
-  /** Relay hostname the initiator actually used when transport is "turn"
-   *  (best-effort, from ICE stats; absent for other transports). */
-  turnNode: external_exports.string().min(1).max(253).optional()
+  transport: selectedTransportEnum
 });
 var pingPongPayloadSchema = external_exports.object({
   nonce: external_exports.string().min(1)
@@ -61086,11 +61067,6 @@ var ControlLease = class {
     }
     return true;
   }
-  remainingMs() {
-    if (!this.confirmed || this.stopped || !this.deadline)
-      return void 0;
-    return Math.max(0, Math.min(this.deadline.mono - performance.now(), this.deadline.wall - Date.now()));
-  }
   canDetach() {
     return this.confirmed && this.valid();
   }
@@ -61220,7 +61196,7 @@ var AdaptiveTransport = class extends BaseTransport {
       };
       socket.onclose = (event) => {
         if (this.lifetime === lifetime && this.socket === socket)
-          this.controlLost(adaptiveControlCloseError(event), { reason: "control-closed", closeCode: event.code, closeReason: event.reason });
+          this.controlLost(adaptiveControlCloseError(event), { reason: "control-closed", closeCode: event.code });
       };
     });
   }
@@ -61264,14 +61240,12 @@ var AdaptiveTransport = class extends BaseTransport {
     };
   }
   async connectionDetails() {
-    const remainingMs = this.lease?.remainingMs();
     return {
       ...this.connectionId === void 0 ? {} : { connectionId: this.connectionId },
       ...this.connectedAt === void 0 ? {} : { connectedAt: this.connectedAt },
       ...this.heartbeatIntervalMs === void 0 ? {} : { heartbeatIntervalMs: this.heartbeatIntervalMs },
       ...this.lastControlReceivedAt === void 0 ? {} : { lastControlReceivedAt: this.lastControlReceivedAt },
       ...this.lastControlSentAt === void 0 ? {} : { lastControlSentAt: this.lastControlSentAt },
-      recoveryExpiresAt: remainingMs === void 0 ? void 0 : Date.now() + remainingMs,
       controlChannelUrl: this.url,
       controlChannelState: socketState(this.socket?.readyState),
       preferredTransports: this.options.forceRelay === true ? ["relay"] : [...this.options.preferredTransports ?? DEFAULT_PREFERRED_TRANSPORTS],
@@ -61595,8 +61569,7 @@ var AdaptiveTransport = class extends BaseTransport {
     socket?.close();
     if (this.recoveryTimer !== void 0)
       return;
-    const delay = recoveryDelayMs(this.recoveryAttempt, diagnostic);
-    this.recoveryAttempt++;
+    const delay = this.recoveryAttempt++ === 0 ? 0 : Math.min(15e3, 1e3 * 2 ** Math.min(this.recoveryAttempt, 4)) * (0.8 + Math.random() * 0.4);
     this.recoveryTimer = setTimeout(() => {
       this.recoveryTimer = void 0;
       void this.reopenControl();
@@ -61638,7 +61611,7 @@ var AdaptiveTransport = class extends BaseTransport {
       };
       socket.onclose = (event) => {
         if (this.socket === socket)
-          this.controlLost(adaptiveControlCloseError(event), { reason: "control-closed", closeCode: event.code, closeReason: event.reason });
+          this.controlLost(adaptiveControlCloseError(event), { reason: "control-closed", closeCode: event.code });
       };
     } catch (error62) {
       if (this.lifetime !== lifetime)
@@ -61814,7 +61787,6 @@ var AdaptiveTransport = class extends BaseTransport {
     }
     const established = this.connectedAt !== void 0;
     this.controlReady = false;
-    this.recoveryAttempt = 0;
     this.lease?.stop();
     this.lease = void 0;
     this.recoveryTicket = void 0;
@@ -61861,21 +61833,13 @@ var AdaptiveTransport = class extends BaseTransport {
   }
 };
 function adaptiveControlCloseError(event) {
-  const serverShutdown = isServerShutdownClose(event.code, event.reason);
-  const heartbeatTimeout = isHeartbeatTimeoutClose(event.code, event.reason);
+  const heartbeatTimeout = event.code === 4001 && (event.reason === "CONNECTION_FAILED" || event.reason === "server shutdown") || event.code === 4009;
   const reason = event.reason.trim().slice(0, 300);
   const detail = reason.length > 0 ? `${reason} (WebSocket ${event.code})` : `WebSocket closed with code ${event.code}`;
   return Object.assign(new Error(`Adaptive control channel closed: ${detail}`), {
-    // Preserve the specific self-hosted authorization reasons so the Client
-    // runtime can surface a terminal reauthorization state instead of a generic
-    // transport loss (PR #285). Every other close keeps the shared semantics.
-    code: event.code === 4003 ? "CONNECTION_REPLACED" : event.code === 4001 && ["AUTH_INVALID", "TOKEN_EXPIRED", "DEVICE_REVOKED"].includes(reason) ? reason : "TRANSPORT_CLOSED",
-    retryable: serverShutdown || heartbeatTimeout || [1e3, 1001, 1006, 1011, 1012, 1013].includes(event.code)
+    code: event.code === 4003 ? "CONNECTION_REPLACED" : "TRANSPORT_CLOSED",
+    retryable: heartbeatTimeout || event.code === 1e3 || event.code === 1001 || event.code === 1006 || event.code === 1011 || event.code === 1012 || event.code === 1013
   });
-}
-var CONTROL_RECOVERY_MAX_DELAY_MS = 15e3;
-function recoveryDelayMs(_attempt, _diagnostic) {
-  return Math.random() * CONTROL_RECOVERY_MAX_DELAY_MS;
 }
 function isObject2(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
