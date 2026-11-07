@@ -79,7 +79,7 @@ try {
     // uses a loader-only export seam to reach private transport functions in
     // the SAME packed bundle. It neither substitutes nor rebuilds their code.
     const output = run(process.execPath, [join(root, 'scripts/verify-packed-webrtc-runtime.mjs'),
-      join(plugin, label === 'github' ? 'index.js' : bundle), join(plugin, bundle)], generation)
+      join(plugin, label === 'github' ? 'index.js' : bundle), join(plugin, bundle), manifest.name], generation)
     console.log(`${label}: ${count} production packages, closure validation passed; ${output.trim()}`)
   }
 } finally {

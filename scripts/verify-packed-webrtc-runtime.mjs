@@ -6,7 +6,9 @@ import { setTimeout as delay } from 'node:timers/promises'
 
 assert.equal(typeof globalThis.require, 'undefined', 'smoke must run in pure ESM')
 assert.equal(process.env.ELECTRON_RUN_AS_NODE, undefined, 'run with the Node runtime, not Electron')
-const [entry, bundle] = process.argv.slice(2).map(path => pathToFileURL(path).href)
+const [entryPath, bundlePath, expectedName] = process.argv.slice(2)
+assert.ok(expectedName, 'the packed package name must be passed as the third argument')
+const [entry, bundle] = [entryPath, bundlePath].map(path => pathToFileURL(path).href)
 let nativeAttempts = 0
 const hooks = registerHooks({
   resolve(specifier, context, next) {
@@ -29,7 +31,7 @@ const deadline = setTimeout(() => { console.error('packed WebRTC smoke timed out
 const peers = []
 try {
   const plugin = await import(entry)
-  assert.equal(plugin.name, 'ds-harness-remote')
+  assert.equal(plugin.name, expectedName)
   assert.equal(typeof plugin.apply, 'function')
   assert.equal(nativeAttempts, 0, 'package import must not initialize native RTC')
   const runtime = await import(`${bundle}?transport-smoke`)
