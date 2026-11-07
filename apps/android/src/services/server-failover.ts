@@ -49,6 +49,19 @@ export function resolveServerTargets(input: ServerTargetsInput): string[] {
 }
 
 /**
+ * The primary origin is unreachable and the standby origin could not be used
+ * yet. The Host switches origins on its own timeline (a sustained outage, not a
+ * single failed attempt), so the client keeps retrying instead of treating this
+ * as a terminal failure the user must resolve.
+ */
+export class FailoverPendingError extends Error {
+  constructor(message: string, readonly primaryError: unknown) {
+    super(message)
+    this.name = 'FailoverPendingError'
+  }
+}
+
+/**
  * Counts consecutive healthy probes of the primary server.
  *
  * A single stray 200 must not move the app back, and a failed probe resets the

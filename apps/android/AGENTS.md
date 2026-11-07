@@ -15,6 +15,11 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before 
 写入空字符串以关闭切换，因此「未设置」与「显式关闭」必须区分处理。设置页展示主/备/当前
 生效 origin，并提供备用地址与账号密码的编辑入口；新增文案已补齐 7 种语言。
 
+主机只在持续离线（默认 2 分钟）后才切换，所以在主机尚未切过去的窗口里，客户端遇到
+主/备都连不上时抛 `FailoverPendingError`：保持离线态并每 30 秒自动重试（上限 10 次，
+约 5 分钟），成功后停止；用户手动断开或鉴权失败时取消重试。App 根部的 `FailoverBanner`
+在「等待主机切换」与「已在备用线路」两种状态下各显示一条提示，避免把切换误判为故障。
+
 本轮验证：Android check（renderer + workspace data plane + tsc）与 53 文件 / 485 tests；
 未构建真机验收，也未做真实故障注入（主服务器下线后手机自动切换、主机恢复后自动切回）。
 

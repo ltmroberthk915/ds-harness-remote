@@ -141,6 +141,8 @@ export interface AppState {
   activeServerUrl?: string
   /** True while `activeServerUrl` is the configured standby origin. */
   serverFailover?: boolean
+  /** The primary origin is down and the Host is expected to move to the standby origin. */
+  failoverPending?: boolean
   /** Persist the standby origin and its one-time authorization account. */
   saveFallbackServer(input: { fallbackBaseUrl?: string; fallbackAccount?: string; fallbackPassword?: string }): Promise<boolean>
 

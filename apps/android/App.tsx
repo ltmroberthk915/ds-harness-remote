@@ -67,9 +67,29 @@ function AppShell() {
     <>
       <ThemedStatusBar />
       <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
+        <FailoverBanner />
         <AppNavigator />
       </SafeAreaView>
     </>
+  )
+}
+
+/**
+ * A one-line notice for the standby line. Both states change what the user sees
+ * (different origin, or a Host that is still switching), so they must not have to
+ * guess why a device looks offline.
+ */
+function FailoverBanner() {
+  const serverFailover = useAppStore(state => state.serverFailover === true)
+  const failoverPending = useAppStore(state => state.failoverPending === true)
+  const styles = useThemedStyles(createStyles)
+  if (!serverFailover && !failoverPending) return null
+  return (
+    <View style={styles.failoverBanner} accessibilityRole="alert">
+      <Text style={styles.failoverBannerText} numberOfLines={2}>
+        {failoverPending ? zhCN.runtime.failoverPending : zhCN.runtime.failoverActive}
+      </Text>
+    </View>
   )
 }
 
@@ -515,6 +535,14 @@ function MissingRoute({ onBack }: { onBack: () => void }) {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
+  failoverBanner: {
+    backgroundColor: colors.warningSoft,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.warning,
+  },
+  failoverBannerText: { ...type.caption, color: colors.ink },
   flex: { flex: 1 },
   globalError: { position: 'absolute', left: 0, right: 0, zIndex: 10 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xl, backgroundColor: colors.background },
