@@ -89,6 +89,33 @@ assert.match(
   'root patch must require only the dsh-TUI command service; optional UI seams must not block activation',
 )
 
+// The npm bundle patch shipped inside packages/plugin is what a profile actually applies when the
+// plugin is installed from the registry or a tarball. A stale instance/package id there inserts an
+// entry pointing at a module that no longer exists, and the plugin then looks enabled while never
+// activating (`1 entry did not activate`, or a silent no-op when the old package is absent).
+const packagePatch = readFileSync(join(root, 'packages/plugin/cordis.patch.yml'), 'utf8')
+assert.doesNotMatch(
+  packagePatch,
+  /ds-harness-remote/,
+  'npm bundle patch must not reference the legacy ds-harness-remote id',
+)
+assert.match(
+  packagePatch,
+  /^\s*- id:\s*dsh-agent-remote\s*$/m,
+  'npm bundle patch must use the canonical Cordis instance id',
+)
+assert.match(
+  packagePatch,
+  /^\s*- id:\s*dsh-agent-remote-tui\s*$/m,
+  'npm bundle patch must keep the dsh-TUI scoped instance id',
+)
+const packagePatchNames = [...packagePatch.matchAll(/^\s*name:\s*['"]?([^'"\s]+)['"]?\s*$/gm)].map(match => match[1])
+assert.deepEqual(
+  packagePatchNames,
+  ['dsh-agent-remote', 'dsh-agent-remote'],
+  'npm bundle patch entries must load the installed package id',
+)
+
 const rootHostEntry = readFileSync(join(root, 'index.js'), 'utf8')
 assert.match(rootHostEntry, /packages\/plugin\/dist\/index\.js/, 'root Host entry must forward to the committed bundle')
 

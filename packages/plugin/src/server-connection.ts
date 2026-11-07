@@ -88,6 +88,15 @@ interface PendingTunnel {
 
 const DEFAULT_WEBRTC_NEGOTIATE_TIMEOUT_MS = 12_000
 
+/** Retryable failures required before the Host considers the primary server gone. */
+const FAILOVER_MIN_FAILURES = 5
+/**
+ * A failover moves the Host to another origin, and Remote clients keep their device
+ * credentials per origin, so a short blip must self-heal instead of triggering a
+ * switch that would force every client to authorize again. Require a sustained outage.
+ */
+const FAILOVER_MIN_OUTAGE_MS = 5 * 60_000
+
 export class HostServerConnection {
   private socket?: WebSocketLike
   private running?: Promise<void>
@@ -106,6 +115,8 @@ export class HostServerConnection {
   private webRtcNegotiateTimeoutMs = DEFAULT_WEBRTC_NEGOTIATE_TIMEOUT_MS
   /** Consecutive retryable connection failures; used to trigger a server failover. */
   private consecutiveFailures = 0
+  /** When the current failure streak started; a failover needs a sustained outage. */
+  private failingSince: number | undefined
   /** The failover callback has already been requested for this connection. */
   private failoverRequested = false
 
@@ -217,14 +228,18 @@ export class HostServerConnection {
         }
         if (TERMINAL_AUTH_ERRORS.has(code) || code === 'UNSUPPORTED_VERSION') { await this.dropTunnels(); return }
         if (!this.config.reconnect.enabled) return
-          if (!TERMINAL_AUTH_ERRORS.has(code) && code !== 'UNSUPPORTED_VERSION') {
-            this.consecutiveFailures += 1
-            if (this.consecutiveFailures >= 5 && !this.failoverRequested && this.onFailover !== undefined) {
-              this.failoverRequested = true
-              this.logger.warn('primary server kept failing; switching to the fallback server')
-              try { this.onFailover() } catch (failoverError) { this.logger.error('fallback server switch failed', { code: errorCode(failoverError) }) }
-            }
-          }
+        this.consecutiveFailures += 1
+        this.failingSince ??= Date.now()
+        if (
+          this.consecutiveFailures >= FAILOVER_MIN_FAILURES
+          && Date.now() - this.failingSince >= FAILOVER_MIN_OUTAGE_MS
+          && !this.failoverRequested
+          && this.onFailover !== undefined
+        ) {
+          this.failoverRequested = true
+          this.logger.warn('primary server kept failing; switching to the fallback server')
+          try { this.onFailover() } catch (failoverError) { this.logger.error('fallback server switch failed', { code: errorCode(failoverError) }) }
+        }
       }
       if (this.stopped) return
       if (this.reconnectRequested) {
@@ -326,7 +341,8 @@ export class HostServerConnection {
               if (tunnel.lease && !this.negotiatedCapabilities.includes(required)) await this.dropTunnel(tunnel.connectionId)
             }
             this.online = true
-              this.consecutiveFailures = 0
+            this.consecutiveFailures = 0
+            this.failingSince = undefined
             this.terminalError = undefined
             this.logger.info('server control connection online', {
               serverVersion: payload.serverVersion,

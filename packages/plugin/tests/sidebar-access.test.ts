@@ -35,8 +35,10 @@ describe('native sidebar access boundaries', () => {
     for (const endpoint of ['workspaceFiles/write', 'workspaceFiles/delete', 'terminal/exec', 'terminal/spawn']) {
       await expect(bridge.call({ endpoint, payload: { args: {} } })).rejects.toMatchObject({ code: 'METHOD_NOT_ALLOWED' })
     }
-    for (const endpoint of ['settings/update', 'settings/replace', 'settings/mutate']) {
-      await expect(bridge.call({ endpoint, payload: { args: { ns: 'ds-harness-remote', patch: { terminal: { enabled: true } } } } })).rejects.toMatchObject({ code: 'PERMISSION_DENIED' })
+    for (const namespace of ['dsh-agent-remote', 'dsh-remote']) {
+      for (const endpoint of ['settings/update', 'settings/replace', 'settings/mutate']) {
+        await expect(bridge.call({ endpoint, payload: { args: { ns: namespace, patch: { terminal: { enabled: true } } } } })).rejects.toMatchObject({ code: 'PERMISSION_DENIED' })
+      }
     }
   })
   it('keeps terminals device-owned through reconnect, scopes input attachments and filters list', async () => {

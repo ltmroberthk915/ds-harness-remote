@@ -1,6 +1,6 @@
 - insert:
-    - id: ds-harness-remote
-      name: 'ds-harness-remote'
+    - id: dsh-agent-remote
+      name: 'dsh-agent-remote'
       # dsh-TUI needs a scoped entry with explicit command/scene injects.
       # Keep this ordinary Desktop entry inactive when that front door exists.
       disabled: !!js >-
@@ -15,8 +15,8 @@
         codex:
           enabled: true
           binary: codex
-    - id: ds-harness-remote-tui
-      name: 'ds-harness-remote'
+    - id: dsh-agent-remote-tui
+      name: 'dsh-agent-remote'
       # The TUI command registry is the only required terminal service. The
       # completion tree and full-screen scene registries are optional seams;
       # the plugin resolves them with ctx.get() and falls back to inline

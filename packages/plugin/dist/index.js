@@ -74844,10 +74844,11 @@ function normalizeServerUrl(value) {
 }
 
 // src/version.ts
-var PLUGIN_VERSION = "0.6.3-fork.3";
+var PLUGIN_VERSION = "0.6.4-fork.3";
 
 // src/server-api.ts
 var TERMINAL_CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/u;
+var HEALTH_PROBE_TIMEOUT_MS = 8e3;
 var HostServerApi = class {
   constructor(serverUrl, store, fetchImplementation = fetch, role = "host") {
     this.store = store;
@@ -74882,6 +74883,30 @@ var HostServerApi = class {
   async hasStoredAuthorization() {
     const identity3 = this.requireIdentity();
     return await this.store.load(this.baseUrl, identity3.deviceId) !== void 0;
+  }
+  /**
+   * Reachability probe for a server origin, used when deciding whether a Host that
+   * failed over may return to its primary server. Credentials are deliberately not
+   * involved: both the official server and the embedded one answer `/health`, and a
+   * 2xx proves the origin is serving again. Anything else (a network error, a
+   * Cloudflare `530` while a tunnel is down, any non-2xx) counts as not recovered.
+   */
+  async checkHealth() {
+    const controller = new AbortController();
+    const timer2 = setTimeout(() => controller.abort(), HEALTH_PROBE_TIMEOUT_MS);
+    const signal = AbortSignal.any([this.lifetime.signal, controller.signal]);
+    try {
+      const response = await this.fetchImplementation(`${this.baseUrl}/health`, {
+        method: "GET",
+        signal,
+        headers: { Accept: "application/json" }
+      });
+      return response.ok;
+    } catch {
+      return false;
+    } finally {
+      clearTimeout(timer2);
+    }
   }
   async clearAuthorization() {
     this.credentials = void 0;
@@ -86979,6 +87004,8 @@ function isOversizedListing(value) {
 
 // src/server-connection.ts
 var DEFAULT_WEBRTC_NEGOTIATE_TIMEOUT_MS = 12e3;
+var FAILOVER_MIN_FAILURES = 5;
+var FAILOVER_MIN_OUTAGE_MS = 5 * 6e4;
 var HostServerConnection = class {
   constructor(config2, identity3, identities, api, connections, logger2, createWebSocket = (url2) => new WebSocket(url2), rtcFactoryProvider, hostCapabilities = () => [], harnessVersion, onFailover) {
     this.config = config2;
@@ -87010,6 +87037,8 @@ var HostServerConnection = class {
   webRtcNegotiateTimeoutMs = DEFAULT_WEBRTC_NEGOTIATE_TIMEOUT_MS;
   /** Consecutive retryable connection failures; used to trigger a server failover. */
   consecutiveFailures = 0;
+  /** When the current failure streak started; a failover needs a sustained outage. */
+  failingSince;
   /** The failover callback has already been requested for this connection. */
   failoverRequested = false;
   start() {
@@ -87108,16 +87137,15 @@ var HostServerConnection = class {
           return;
         }
         if (!this.config.reconnect.enabled) return;
-        if (!TERMINAL_AUTH_ERRORS.has(code) && code !== "UNSUPPORTED_VERSION") {
-          this.consecutiveFailures += 1;
-          if (this.consecutiveFailures >= 5 && !this.failoverRequested && this.onFailover !== void 0) {
-            this.failoverRequested = true;
-            this.logger.warn("primary server kept failing; switching to the fallback server");
-            try {
-              this.onFailover();
-            } catch (failoverError) {
-              this.logger.error("fallback server switch failed", { code: errorCode4(failoverError) });
-            }
+        this.consecutiveFailures += 1;
+        this.failingSince ??= Date.now();
+        if (this.consecutiveFailures >= FAILOVER_MIN_FAILURES && Date.now() - this.failingSince >= FAILOVER_MIN_OUTAGE_MS && !this.failoverRequested && this.onFailover !== void 0) {
+          this.failoverRequested = true;
+          this.logger.warn("primary server kept failing; switching to the fallback server");
+          try {
+            this.onFailover();
+          } catch (failoverError) {
+            this.logger.error("fallback server switch failed", { code: errorCode4(failoverError) });
           }
         }
       }
@@ -87208,6 +87236,7 @@ var HostServerConnection = class {
             }
             this.online = true;
             this.consecutiveFailures = 0;
+            this.failingSince = void 0;
             this.terminalError = void 0;
             this.logger.info("server control connection online", {
               serverVersion: payload.serverVersion,
@@ -89096,6 +89125,8 @@ var CodexWorkspaceBridge = class extends WorkspaceBridge {
 };
 
 // src/service.ts
+var PRIMARY_RECOVERY_PROBE_MS = 6e4;
+var PRIMARY_RECOVERY_CONFIRMATIONS = 2;
 var HostPluginRuntime = class {
   constructor(config2, identities, logger2, localGateway, fileViewerHost, terminalSpawner, pluginRoutes) {
     this.config = config2;
@@ -89179,6 +89210,10 @@ var HostPluginRuntime = class {
   harnessVersion;
   closed = false;
   failoverInFlight = false;
+  /** Origin the Host left behind when it failed over; probed so a recovered primary is picked up. */
+  primaryServerUrl;
+  primaryProbe;
+  primaryProbeHits = 0;
   codex;
   acp;
   codexWorkspaceState = new WorkspaceBridgeState((key) => TerminalPolicy.releaseOwner(this.terminalOwners, key));
@@ -89415,6 +89450,7 @@ var HostPluginRuntime = class {
   async close() {
     if (this.closed) return;
     this.closed = true;
+    this.stopPrimaryRecoveryProbe();
     this.serverApi?.close();
     await this.serverConnection?.stop();
     await this.connections.close();
@@ -89464,38 +89500,106 @@ var HostPluginRuntime = class {
     );
   }
   /**
-   * Switch the Host to `fallbackServerUrl` after the primary server keeps failing.
-   * Rebuilds the server API (credentials are stored per server origin) and
-   * restarts the control connection; no-op when no fallback is configured.
+   * Move the Host to `targetUrl`: rebuild the origin-scoped server API and restart the
+   * control connection. Used both when the primary server keeps failing and when a
+   * recovered primary server is picked up again.
    */
-  switchToFallbackServer() {
-    const fallbackUrl = this.config.fallbackServerUrl;
-    if (fallbackUrl === void 0 || this.config.serverUrl === fallbackUrl) return;
+  switchServer(targetUrl, options = {}) {
     if (this.closed || this.failoverInFlight) return;
     this.failoverInFlight = true;
     void (async () => {
       try {
-        this.logger.warn("switching Host connection to the fallback server", {
-          from: this.config.serverUrl ?? "(unset)",
-          to: fallbackUrl
-        });
         const previous = this.serverConnection;
         this.serverConnection = void 0;
         await previous?.stop().catch(() => void 0);
         const identity3 = this.identity;
         if (identity3 === void 0 || this.closed) return;
-        this.serverApi = new HostServerApi(fallbackUrl, new ServerCredentialStore(this.identities.directory));
-        this.config.serverUrl = fallbackUrl;
+        this.serverApi?.close();
+        this.serverApi = new HostServerApi(targetUrl, new ServerCredentialStore(this.identities.directory));
+        this.serverApi.bindIdentity(identity3);
+        this.serverApi.setHarnessVersion(this.harnessVersion);
+        if (options.authorizeFallbackAccount === true) {
+          const account = this.config.selfHost.account;
+          const password = this.config.selfHost.password;
+          if (account !== "" && password !== "") {
+            try {
+              if (!await this.serverApi.hasStoredAuthorization()) {
+                await this.serverApi.authorizeWithAccount(identity3, account, password);
+                this.logger.info("authorized Host on the fallback server");
+              }
+            } catch (authorizeError) {
+              this.logger.warn("fallback server authorization failed; log in manually in Remote settings", {
+                message: authorizeError instanceof Error ? authorizeError.message : String(authorizeError)
+              });
+            }
+          }
+        }
+        this.config.serverUrl = targetUrl;
         this.serverConnection = this.createServerConnection(identity3);
         this.serverConnection.start();
       } catch (error62) {
-        this.logger.error("fallback server switch failed", {
+        this.logger.error("server switch failed", {
           message: error62 instanceof Error ? error62.message : String(error62)
         });
       } finally {
         this.failoverInFlight = false;
       }
     })();
+  }
+  /**
+   * Fail over to `fallbackServerUrl` after the primary server stayed unreachable, then
+   * keep probing the primary so the Host returns to it automatically once it recovers.
+   * Clients authorize per origin, so a failover is never transparent to them.
+   */
+  switchToFallbackServer() {
+    const fallbackUrl = this.config.fallbackServerUrl;
+    const primaryUrl = this.config.serverUrl;
+    if (fallbackUrl === void 0 || primaryUrl === fallbackUrl) return;
+    if (this.closed) return;
+    this.logger.warn("switching Host connection to the fallback server", {
+      from: primaryUrl ?? "(unset)",
+      to: fallbackUrl
+    });
+    this.primaryServerUrl = primaryUrl;
+    this.switchServer(fallbackUrl, { authorizeFallbackAccount: true });
+    this.startPrimaryRecoveryProbe();
+  }
+  startPrimaryRecoveryProbe() {
+    this.stopPrimaryRecoveryProbe();
+    if (this.closed) return;
+    const timer2 = setInterval(() => {
+      void this.probePrimaryServer();
+    }, PRIMARY_RECOVERY_PROBE_MS);
+    timer2.unref?.();
+    this.primaryProbe = timer2;
+  }
+  stopPrimaryRecoveryProbe() {
+    if (this.primaryProbe !== void 0) clearInterval(this.primaryProbe);
+    this.primaryProbe = void 0;
+    this.primaryProbeHits = 0;
+  }
+  /** Return to the primary server once it answers again, so a failover does not stick forever. */
+  async probePrimaryServer() {
+    const primaryUrl = this.primaryServerUrl;
+    if (primaryUrl === void 0 || this.closed || this.failoverInFlight) return;
+    const probe = new HostServerApi(primaryUrl, new ServerCredentialStore(this.identities.directory));
+    let healthy = false;
+    try {
+      healthy = await probe.checkHealth();
+    } finally {
+      probe.close();
+    }
+    if (this.closed || this.primaryServerUrl !== primaryUrl) return;
+    if (!healthy) {
+      this.primaryProbeHits = 0;
+      return;
+    }
+    this.primaryProbeHits += 1;
+    if (this.primaryProbeHits < PRIMARY_RECOVERY_CONFIRMATIONS) return;
+    this.stopPrimaryRecoveryProbe();
+    this.primaryServerUrl = void 0;
+    this.logger.warn("primary server is reachable again; switching the Host back", { to: primaryUrl });
+    this.switchServer(primaryUrl);
   }
   async readHarnessVersion() {
     const version2 = await readHarnessDistributionVersion();
@@ -90127,7 +90231,7 @@ function installTuiRemoteCommand(ctx, resolveTarget) {
           if (scenes === void 0) {
             return {
               kind: "error",
-              text: `The Remote login screen is unavailable. Run "ds-harness-remote login ${provider}" outside dsh-TUI, then restart it.`
+              text: `The Remote login screen is unavailable. Run "dsh-agent-remote login ${provider}" outside dsh-TUI, then restart it.`
             };
           }
           login2.start(provider);
@@ -90163,7 +90267,7 @@ function installTuiRemoteCommand(ctx, resolveTarget) {
     return () => {
       disposeCommand();
     };
-  }, "ds-harness-remote: dsh-tui /remote command");
+  }, "dsh-agent-remote: dsh-tui /remote command");
   tuiContext.inject(["tuiCommandTrees"], (treeContext) => {
     treeContext.effect(() => {
       const trees = treeContext.get("tuiCommandTrees", false);
@@ -90175,7 +90279,7 @@ function installTuiRemoteCommand(ctx, resolveTarget) {
         },
         children: (path) => remoteCommandChildren(path, login2.completionProviders())
       }));
-    }, "ds-harness-remote: dsh-TUI /remote completion");
+    }, "dsh-agent-remote: dsh-TUI /remote completion");
   });
   tuiContext.inject(["tuiScenes"], (sceneContext) => {
     sceneContext.effect(() => {
@@ -90194,9 +90298,9 @@ function installTuiRemoteCommand(ctx, resolveTarget) {
         disposeScene();
         disposeStatusScene();
       };
-    }, "ds-harness-remote: dsh-TUI /remote scenes");
+    }, "dsh-agent-remote: dsh-TUI /remote scenes");
   });
-  tuiContext.effect(() => () => login2.cancel(), "ds-harness-remote: dsh-TUI /remote login");
+  tuiContext.effect(() => () => login2.cancel(), "dsh-agent-remote: dsh-TUI /remote login");
 }
 function registerRemoteCommand(ctx, commands, pluginHost, definition) {
   if (pluginHost === void 0) return commands.register(definition);
@@ -90255,7 +90359,7 @@ function remoteCommandChildren(canonicalPath, providers) {
 }
 function remoteStatusLines(target3) {
   if (target3 === void 0) {
-    return ["Remote Host is disabled or still starting. Check the ds-harness-remote settings and retry."];
+    return ["Remote Host is disabled or still starting. Check the dsh-agent-remote settings and retry."];
   }
   const { runtime, config: config2 } = target3;
   const status2 = runtime.hostStatus();
@@ -90295,7 +90399,7 @@ function remoteCommandUsage() {
 function remoteNotReady() {
   return {
     kind: "error",
-    text: "Remote Host is disabled or still starting. Check the ds-harness-remote settings and retry."
+    text: "Remote Host is disabled or still starting. Check the dsh-agent-remote settings and retry."
   };
 }
 var RemoteLoginController = class {
@@ -91625,7 +91729,10 @@ async function activate(ctx, readConfig, entryId, tuiBinding) {
         });
       }
     }
-    return selfHost === void 0 ? target3 : { ...target3, serverUrl: selfHost.publicUrl };
+    return {
+      ...target3,
+      ...target3.fallbackServerUrl === void 0 && selfHost !== void 0 ? { fallbackServerUrl: selfHost.publicUrl } : {}
+    };
   };
   config2 = ensureSelfHost(config2);
   let { runtime, clientRuntime } = createRuntimes(config2);

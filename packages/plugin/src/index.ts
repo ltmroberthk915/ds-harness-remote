@@ -324,7 +324,15 @@ async function activate(
         })
       }
     }
-    return selfHost === undefined ? target : { ...target, serverUrl: selfHost.publicUrl }
+    // The embedded server is a standby path, not the primary server: keep the
+    // configured serverUrl untouched and expose the embedded origin as the
+    // fallback so a failed primary server switches over automatically.
+    return {
+      ...target,
+      ...(target.fallbackServerUrl === undefined && selfHost !== undefined
+        ? { fallbackServerUrl: selfHost.publicUrl }
+        : {}),
+    }
   }
   config = ensureSelfHost(config)
   let { runtime, clientRuntime } = createRuntimes(config)

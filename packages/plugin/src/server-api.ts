@@ -50,6 +50,9 @@ export type FetchImplementation = typeof fetch
 
 const TERMINAL_CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/u
 
+/** Upper bound for the `/health` probe issued while checking a primary server. */
+const HEALTH_PROBE_TIMEOUT_MS = 8_000
+
 export interface ServerHostDevice {
   deviceId: string
   name: string
@@ -104,6 +107,31 @@ export class HostServerApi {
   async hasStoredAuthorization(): Promise<boolean> {
     const identity = this.requireIdentity()
     return await this.store.load(this.baseUrl, identity.deviceId) !== undefined
+  }
+
+  /**
+   * Reachability probe for a server origin, used when deciding whether a Host that
+   * failed over may return to its primary server. Credentials are deliberately not
+   * involved: both the official server and the embedded one answer `/health`, and a
+   * 2xx proves the origin is serving again. Anything else (a network error, a
+   * Cloudflare `530` while a tunnel is down, any non-2xx) counts as not recovered.
+   */
+  async checkHealth(): Promise<boolean> {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), HEALTH_PROBE_TIMEOUT_MS)
+    const signal = AbortSignal.any([this.lifetime.signal, controller.signal])
+    try {
+      const response = await this.fetchImplementation(`${this.baseUrl}/health`, {
+        method: 'GET',
+        signal,
+        headers: { Accept: 'application/json' },
+      })
+      return response.ok
+    } catch {
+      return false
+    } finally {
+      clearTimeout(timer)
+    }
   }
 
   async clearAuthorization(): Promise<void> {

@@ -203,8 +203,8 @@ describe('Cordis plugin lifecycle', () => {
     const register = vi.fn(() => () => undefined)
     const ctx = new Context()
     ctx.provide('loader', {
-      locate: () => 'include:ds-harness-remote-tui',
-      entries: () => [{ id: 'include:ds-harness-remote-tui', options: { id: 'ds-harness-remote-tui', name: 'ds-harness-remote' } }],
+      locate: () => 'include:dsh-agent-remote-tui',
+      entries: () => [{ id: 'include:dsh-agent-remote-tui', options: { id: 'dsh-agent-remote-tui', name: 'dsh-agent-remote' } }],
     } as never)
     ctx.provide('commands', { register })
     ctx.provide('settings', settings({ deviceName: 'Cordis optional-seams host' }))
@@ -272,7 +272,7 @@ function settings(value: Record<string, unknown>) {
     // These tests exercise Harness registration/disposal, not installed Agent
     // CLIs. Keep optional processes out of the fixture (including the bundled
     // CodeX fallback, which is discoverable even with an isolated PATH).
-    describe: () => [{ ns: 'ds-harness-remote', value: {
+    describe: () => [{ ns: 'dsh-agent-remote', value: {
       ...disabledAgentDomains,
       ...value,
     } }],

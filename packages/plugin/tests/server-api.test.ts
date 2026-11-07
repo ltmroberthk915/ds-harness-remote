@@ -16,6 +16,31 @@ const cleanupContract1 = async () => {
 afterEach(cleanupContract1)
 
 describe('HostServerApi', () => {
+  it('treats only a 2xx health response as a reachable server origin', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'dsh-health-probe-'))
+    directories.push(directory)
+    const rows = [
+      { name: 'healthy server', expected: true, response: () => new Response('{"status":"ok"}', { status: 200 }) },
+      { name: 'missing health route', expected: false, response: () => new Response('{}', { status: 404 }) },
+      // Cloudflare answers 530 while the fallback tunnel is down.
+      { name: 'closed tunnel', expected: false, response: () => new Response('<html>530</html>', { status: 530 }) },
+      { name: 'network error', expected: false, response: () => { throw new TypeError('fetch failed') } },
+    ]
+    await runScenarios(rows.map(row => ({ name: row.name, run: async () => {
+      const fetchMock = vi.fn<typeof fetch>(async input => {
+        expect(String(input)).toBe('https://example.invalid/health')
+        return row.response()
+      })
+      const api = new HostServerApi('https://example.invalid', new ServerCredentialStore(directory), fetchMock)
+      try {
+        expect(await api.checkHealth()).toBe(row.expected)
+        expect(fetchMock).toHaveBeenCalledTimes(1)
+      } finally {
+        api.close()
+      }
+    } })))
+  })
+
   it('cancels runtime-owned HTTP work through response consumption and rejects requests after close', async () => {
     await runScenarios([
       { name: 'close before response headers', body: false, timeout: false },
