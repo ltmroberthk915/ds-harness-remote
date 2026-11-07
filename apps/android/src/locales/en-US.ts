@@ -213,7 +213,7 @@ const enUS = {
   },
   settings: {
     appearance: 'Appearance',
-    title: 'Settings', thisPhone: 'This phone', androidDevice: 'Android device', connection: 'Connection', server: 'Server', account: 'Account', loginMethod: 'Sign-in method', protocol: 'Protocol', notConfigured: 'Not configured', notSignedIn: 'Not signed in',
+    title: 'Settings', thisPhone: 'This phone', androidDevice: 'Android device', connection: 'Connection', server: 'Server', account: 'Account', loginMethod: 'Sign-in method', protocol: 'Protocol', notConfigured: 'Not configured', notSignedIn: 'Not signed in', fallbackServer: 'Standby server', fallbackAccount: 'Standby account', fallbackPassword: 'Standby password', saveFallback: 'Save standby server', fallbackNote: 'Used automatically when the primary server stays unreachable. This phone has to be authorized there once; later switches are automatic.', fallbackSameAsPrimary: 'The standby server must differ from the primary server.', activeServer: 'Active connection', fallbackBadge: 'standby',
     languageShowAll: 'Show all languages',
     language: 'Language', languageSystem: 'System default', languageChinese: '简体中文', languageEnglish: 'English', languageNote: 'With System default, the app follows the Android language setting automatically.',
     compactHistorySaveFailed: 'Could not save compact conversation setting',

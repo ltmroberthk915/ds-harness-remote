@@ -28,6 +28,16 @@ export interface ServerConfig {
   baseUrl: string
   account?: string
   loginMethod?: LoginMethod
+  /**
+   * Standby origin the app falls back to when the primary server stays
+   * unreachable. The Host answers there through its self-hosted server, and
+   * this phone keeps a separate device credential for that origin.
+   */
+  fallbackBaseUrl?: string
+  /** Standby (self-hosted) account; authorizes this phone there once. */
+  fallbackAccount?: string
+  /** Standby password; used only for the one-time registration above. */
+  fallbackPassword?: string
 }
 
 export interface DeviceIdentity {

@@ -213,7 +213,7 @@ const deDE = {
   },
   settings: {
     appearance: "Aussehen",
-    title: "Einstellungen", thisPhone: "Dieses Telefon", androidDevice: "Android-Gerät", connection: "Verbindung", server: "Server", account: "Konto", loginMethod: "Anmeldemethode", protocol: "Protokoll", notConfigured: "Nicht konfiguriert", notSignedIn: "Nicht angemeldet",
+    title: "Einstellungen", thisPhone: "Dieses Telefon", androidDevice: "Android-Gerät", connection: "Verbindung", server: "Server", account: "Konto", loginMethod: "Anmeldemethode", protocol: "Protokoll", notConfigured: "Nicht konfiguriert", notSignedIn: "Nicht angemeldet", fallbackServer: 'Ausweichserver', fallbackAccount: 'Ausweichkonto', fallbackPassword: 'Ausweichpasswort', saveFallback: 'Ausweichserver speichern', fallbackNote: 'Wird automatisch genutzt, wenn der Hauptserver längere Zeit nicht erreichbar ist. Dieses Gerät muss dort einmal autorisiert werden.', fallbackSameAsPrimary: 'Der Ausweichserver muss sich vom Hauptserver unterscheiden.', activeServer: 'Aktive Verbindung', fallbackBadge: 'Ausweiche',
     languageShowAll: "Alle Sprachen anzeigen",
     language: "Sprache", languageSystem: "Systemsprache", languageChinese: "简体中文", languageEnglish: "English", languageNote: "Bei der Systemstandardeinstellung folgt die App automatisch der Android-Spracheinstellung.",
     compactHistorySaveFailed: "Die Einstellung für die kompakte Konversation konnte nicht gespeichert werden",

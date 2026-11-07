@@ -211,7 +211,7 @@ const zhTW = {
   },
   settings: {
     appearance: '外觀',
-    title: '設定', thisPhone: '此手機', androidDevice: 'Android 裝置', connection: '連線', server: '伺服器', account: '賬號', loginMethod: '登入方式', protocol: '協議', notConfigured: '未配置', notSignedIn: '未登入',
+    title: '設定', thisPhone: '此手機', androidDevice: 'Android 裝置', connection: '連線', server: '伺服器', account: '賬號', loginMethod: '登入方式', protocol: '協議', notConfigured: '未配置', notSignedIn: '未登入', fallbackServer: '備用伺服器', fallbackAccount: '備用帳號', fallbackPassword: '備用密碼', saveFallback: '儲存備用伺服器', fallbackNote: '官方伺服器長時間無法使用時會自動切換到這裡。第一次需要在備用伺服器授權本機，之後全自動。', fallbackSameAsPrimary: '備用伺服器不能與主伺服器相同。', activeServer: '目前連線', fallbackBadge: '備用',
     languageShowAll: '展開所有語言',
     language: '語言', languageSystem: '跟隨系統', languageChinese: '简体中文', languageEnglish: 'English', languageNote: '選擇“跟隨系統”後，App 會隨 Android 的語言設定自動切換。',
     compactHistorySaveFailed: '無法儲存會話精簡設定',

@@ -213,7 +213,7 @@ const jaJP = {
   },
   settings: {
     appearance: "外観",
-    title: "設定", thisPhone: "この電話", androidDevice: "Androidデバイス", connection: "繋がり", server: "サーバ", account: "アカウント", loginMethod: "サインイン方法", protocol: "プロトコル", notConfigured: "未設定", notSignedIn: "サインインしていません",
+    title: "設定", thisPhone: "この電話", androidDevice: "Androidデバイス", connection: "繋がり", server: "サーバ", account: "アカウント", loginMethod: "サインイン方法", protocol: "プロトコル", notConfigured: "未設定", notSignedIn: "サインインしていません", fallbackServer: '予備サーバー', fallbackAccount: '予備アカウント', fallbackPassword: '予備パスワード', saveFallback: '予備サーバーを保存', fallbackNote: '公式サーバーが長時間利用できないときに自動で切り替わります。この端末を予備サーバーで一度認証してください。', fallbackSameAsPrimary: '予備サーバーはメインサーバーと別である必要があります。', activeServer: '現在の接続', fallbackBadge: '予備',
     languageShowAll: "すべての言語を表示",
     language: "言語", languageSystem: "システム設定に従う", languageChinese: "简体中文", languageEnglish: "English", languageNote: "「システム設定に従う」を選ぶと、Android の言語設定に合わせて自動的に切り替わります。",
     compactHistorySaveFailed: "コンパクト会話設定を保存できませんでした",

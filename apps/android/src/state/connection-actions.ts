@@ -1,10 +1,15 @@
 import { browseScope, useBrowseMemory } from '../services/browse-memory'
 import { friendlyError, isSessionAuthError } from '../lib/errors'
 import { initialProbeTransports } from '../lib/network-route'
+import { normalizeServerUrl } from '../lib/server-url'
 import { strings as zhCN } from '../locales/i18n'
 import { resolveAutomaticPreferredTransports } from '../services/network-route'
 import { serverSession } from '../services/server-session'
+import { AccountRequiredError, type AuthenticatedServer } from '../services/server-session-manager'
+import { resolveServerTargets } from '../services/server-failover'
+import { startPrimaryRecovery, stopPrimaryRecovery } from '../services/server-recovery'
 import { saveLastConnectedDeviceId } from '../services/storage'
+import type { DeviceIdentity, ServerConfig } from '../types'
 import type { SessionAccess } from './session-runtime'
 import type { AppState } from './store-state'
 import { disconnected } from './store-state'
@@ -17,6 +22,46 @@ import { disconnected } from './store-state'
 const RELAY_DOWNGRADE_MS = 100 * 365 * 24 * 60 * 60_000
 /** Host description is presentation data; it must never delay a usable link. */
 const HOST_DESCRIBE_TIMEOUT_MS = 2_000
+
+interface AuthenticatedTarget extends AuthenticatedServer {
+  /** Origin the credentials belong to. */
+  baseUrl: string
+}
+
+/**
+ * Authenticate against the primary origin first, then the configured standby
+ * origin. Device credentials are stored per origin, so a standby the phone was
+ * authorized on before connects silently.
+ *
+ * Only reachability failures fail over: rejected credentials on a reachable
+ * primary are a login problem and must not silently move the app to another
+ * origin. When the standby has no device credential yet, the configured standby
+ * account authorizes this phone once, so later failovers need no user action.
+ */
+async function authenticateServerTargets(config: ServerConfig, identity: DeviceIdentity): Promise<AuthenticatedTarget> {
+  const primary = normalizeServerUrl(config.baseUrl)
+  const targets = resolveServerTargets(config)
+  for (const target of targets) {
+    try {
+      return { baseUrl: target, ...(await serverSession.authenticate(target, identity)) }
+    } catch (error) {
+      if (target === primary) {
+        if (isSessionAuthError(error) || targets.length === 1) throw error
+        continue
+      }
+      if (error instanceof AccountRequiredError) {
+        const account = config.fallbackAccount?.trim() ?? ''
+        const password = config.fallbackPassword ?? ''
+        if (account !== '' && password !== '') {
+          return { baseUrl: target, ...(await serverSession.authenticateWithAccount(target, identity, account, password)) }
+        }
+        throw new Error(zhCN.settings.fallbackNote)
+      }
+      throw error
+    }
+  }
+  throw new Error(zhCN.errors.serverUnreachable)
+}
 
 export function createConnectionActions({ get, set, runtime }: SessionAccess): Pick<AppState,
   'connectDevice' | 'reconnect' | 'resumeConnection' | 'refreshConnectionNetworkDetails' | 'disconnect' | 'setOffline'> {
@@ -73,8 +118,9 @@ export function createConnectionActions({ get, set, runtime }: SessionAccess): P
         await runtime.closeActiveCodexStream(false)
         await runtime.closeActiveCursorStream(false)
         const authStartedAt = Date.now()
-        const { api, credentials } = await serverSession.authenticate(config.baseUrl, identity)
+        const { api, credentials, baseUrl: serverBaseUrl } = await authenticateServerTargets(config, identity)
         const authMs = Date.now() - authStartedAt
+        const failover = serverBaseUrl !== normalizeServerUrl(config.baseUrl)
         const preference = get().transportPreference
         const relayOnlyActive = (get().relayOnlyUntil ?? 0) > Date.now()
         const forceRelay = options.forceRelay === true || preference === 'relay' || relayOnlyActive
@@ -87,13 +133,13 @@ export function createConnectionActions({ get, set, runtime }: SessionAccess): P
         set({ connectionStage: 'transport', connectionProbeOrder: initialProbeTransports(preferredTransports) })
         const transportStartedAt = Date.now()
         await runtime.connection.connect(
-          config.baseUrl,
+          serverBaseUrl,
           identity,
           device,
           credentials.accessToken,
           frame => runtime.enqueueMuxFrame(generation, frame),
           {
-            refreshAccessToken: async () => (await serverSession.authenticate(config.baseUrl, identity)).credentials.accessToken,
+            refreshAccessToken: async () => (await serverSession.authenticate(serverBaseUrl, identity)).credentials.accessToken,
             fetchIceServers: async connectionId => api.turnCredentials(connectionId),
             preferredTransports: [...preferredTransports],
             forceRelay,
@@ -196,11 +242,28 @@ export function createConnectionActions({ get, set, runtime }: SessionAccess): P
           },
           lastConnectedDeviceId: device.deviceId,
           pendingAutoConnectDeviceId: undefined,
+          activeServerUrl: serverBaseUrl,
+          serverFailover: failover,
           connection: { phase: 'connected', stats: connectedStats },
           ...(connectedStats.mode !== 'Relay' && connectedStats.mode !== 'Disconnected' ? { relayOnlyUntil: undefined } : {}),
         })
         runtime.connectionStartedAt = Date.now()
         await saveLastConnectedDeviceId(device.deviceId)
+        if (failover) {
+          // Keep the working standby connection and return to the primary server
+          // only after it answered healthily twice in a row.
+          startPrimaryRecovery({
+            primaryUrl: normalizeServerUrl(config.baseUrl),
+            onRecovered: () => {
+              const current = get()
+              if (current.connection.phase !== 'connected' || current.serverFailover !== true) return
+              console.info('[dsh-remote] primary server recovered; switching back')
+              void get().reconnect()
+            },
+          })
+        } else {
+          stopPrimaryRecovery()
+        }
         return true
       } catch (error) {
         if (generation !== runtime.connectionGeneration) return false
@@ -300,6 +363,7 @@ export function createConnectionActions({ get, set, runtime }: SessionAccess): P
     },
 
     async disconnect() {
+      stopPrimaryRecovery()
       runtime.flushPendingMuxFrames()
       ++runtime.connectionGeneration
       ++runtime.sessionLoadGeneration
@@ -339,6 +403,8 @@ export function createConnectionActions({ get, set, runtime }: SessionAccess): P
         historyHasMore: false,
         historyLoadingOlder: false,
         oldestLoadedSeq: undefined,
+        activeServerUrl: undefined,
+        serverFailover: undefined,
       })
     },
 

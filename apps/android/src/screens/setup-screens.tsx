@@ -10,6 +10,8 @@ import { BatteryCharging, Bell, BellRing, Cable, Check, ChevronRight, Download, 
 import { useAppStore } from '../state/store'
 import type { QrLoginStart } from '../state/store-state'
 import { SOURCE_CODE_URL } from '../lib/links'
+import { DEFAULT_FALLBACK_SERVER_URL } from '../lib/defaults'
+import { standbyServerUrl } from '../services/server-failover'
 import { foregroundService } from '../services/foreground-service'
 import type { OAuthProviderInfo } from '../services/api'
 import { BlurHeaderFrame, Button, Field, GroupCard, GroupRow, IconButton, KeyValue, Screen, SectionTitle, TopBar } from '../ui/components'
@@ -621,6 +623,31 @@ export function SettingsScreen({ onBack, onReset }: { onBack: () => void; onRese
   const defaultPermission = useAppStore(state => state.defaultPermissionPreset)
   const setDefaultPermission = useAppStore(state => state.setDefaultPermissionPreset)
   const [permissionSaving, setPermissionSaving] = useState(false)
+  const activeServerUrl = useAppStore(state => state.activeServerUrl)
+  const serverFailover = useAppStore(state => state.serverFailover === true)
+  const standbyUrl = standbyServerUrl(config ?? { baseUrl: '' })
+  const saveFallbackServer = useAppStore(state => state.saveFallbackServer)
+  const [fallbackUrlDraft, setFallbackUrlDraft] = useState(config?.fallbackBaseUrl ?? DEFAULT_FALLBACK_SERVER_URL)
+  const [fallbackAccountDraft, setFallbackAccountDraft] = useState(config?.fallbackAccount ?? '')
+  const [fallbackPasswordDraft, setFallbackPasswordDraft] = useState(config?.fallbackPassword ?? '')
+  const [fallbackSaving, setFallbackSaving] = useState(false)
+  useEffect(() => {
+    setFallbackUrlDraft(config?.fallbackBaseUrl ?? DEFAULT_FALLBACK_SERVER_URL)
+    setFallbackAccountDraft(config?.fallbackAccount ?? '')
+    setFallbackPasswordDraft(config?.fallbackPassword ?? '')
+  }, [config?.fallbackBaseUrl, config?.fallbackAccount, config?.fallbackPassword])
+  const saveFallback = async () => {
+    setFallbackSaving(true)
+    try {
+      await saveFallbackServer({
+        fallbackBaseUrl: fallbackUrlDraft,
+        fallbackAccount: fallbackAccountDraft,
+        fallbackPassword: fallbackPasswordDraft,
+      })
+    } finally {
+      setFallbackSaving(false)
+    }
+  }
   const reset = useAppStore(state => state.resetLocalData)
   const signOut = useAppStore(state => state.signOut)
   const { colors } = useTheme()
@@ -850,10 +877,56 @@ export function SettingsScreen({ onBack, onReset }: { onBack: () => void; onRese
             <SectionTitle>{zhCN.settings.connection}</SectionTitle>
             <GroupCard>
               <GroupRow first icon={Globe} label={zhCN.settings.server} value={config?.baseUrl?.replace(/^https?:\/\//, '') ?? zhCN.settings.notConfigured} />
+              {standbyUrl === undefined ? undefined : (
+                <GroupRow
+                  icon={Signal}
+                  label={zhCN.settings.fallbackServer}
+                  value={`${standbyUrl.replace(/^https?:\/\//, '')}${serverFailover ? ` · ${zhCN.settings.fallbackBadge}` : ''}`}
+                />
+              )}
+              {activeServerUrl === undefined ? undefined : (
+                <GroupRow
+                  icon={Cable}
+                  label={zhCN.settings.activeServer}
+                  value={`${activeServerUrl.replace(/^https?:\/\//, '')}${serverFailover ? ` · ${zhCN.settings.fallbackBadge}` : ''}`}
+                />
+              )}
               <GroupRow icon={UserRound} label={zhCN.settings.account} value={account ?? zhCN.settings.notSignedIn} />
               <GroupRow icon={KeyRound} label={zhCN.settings.loginMethod} value={loginMethodLabel(config?.loginMethod)} />
               <GroupRow icon={Cable} label={zhCN.settings.protocol} value="DSH Remote v1" />
             </GroupCard>
+
+            <SectionTitle>{zhCN.settings.fallbackServer}</SectionTitle>
+            <GroupCard>
+              <View style={styles.emailForm}>
+                <Field
+                  label={zhCN.settings.fallbackServer}
+                  value={fallbackUrlDraft}
+                  onChangeText={setFallbackUrlDraft}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  placeholder="https://"
+                />
+                <Field
+                  label={zhCN.settings.fallbackAccount}
+                  value={fallbackAccountDraft}
+                  onChangeText={setFallbackAccountDraft}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <Field
+                  label={zhCN.settings.fallbackPassword}
+                  value={fallbackPasswordDraft}
+                  onChangeText={setFallbackPasswordDraft}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <Button label={zhCN.settings.saveFallback} onPress={() => void saveFallback()} loading={fallbackSaving} />
+              </View>
+            </GroupCard>
+            <Text style={styles.preferenceNote}>{zhCN.settings.fallbackNote}</Text>
 
             <SectionTitle>{zhCN.settings.transport}</SectionTitle>
             <GroupCard>

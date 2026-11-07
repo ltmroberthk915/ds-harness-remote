@@ -211,7 +211,7 @@ const zhCN = {
   },
   settings: {
     appearance: '外观',
-    title: '设置', thisPhone: '此手机', androidDevice: 'Android 设备', connection: '连接', server: '服务器', account: '账号', loginMethod: '登录方式', protocol: '协议', notConfigured: '未配置', notSignedIn: '未登录',
+    title: '设置', thisPhone: '此手机', androidDevice: 'Android 设备', connection: '连接', server: '服务器', account: '账号', loginMethod: '登录方式', protocol: '协议', notConfigured: '未配置', notSignedIn: '未登录', fallbackServer: '备用服务器', fallbackAccount: '备用账号', fallbackPassword: '备用密码', saveFallback: '保存备用服务器', fallbackNote: '官方服务器长时间不可用时自动切到这里。第一次需要在备用服务器授权本机，之后全自动。', fallbackSameAsPrimary: '备用服务器不能与主服务器相同。', activeServer: '当前连接', fallbackBadge: '备用',
     languageShowAll: '展开所有语言',
     language: '语言', languageSystem: '跟随系统', languageChinese: '简体中文', languageEnglish: 'English', languageNote: '选择“跟随系统”后，App 会随 Android 的语言设置自动切换。',
     compactHistorySaveFailed: '无法保存会话精简设置',

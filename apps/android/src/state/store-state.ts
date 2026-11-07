@@ -137,6 +137,12 @@ export interface AppState {
   pendingAutoConnectDeviceId?: string
   /** True when credentials are invalid and the UI should show the sign-in screen. */
   reauthRequired: boolean
+  /** Origin carrying the current connection; undefined before the first connect. */
+  activeServerUrl?: string
+  /** True while `activeServerUrl` is the configured standby origin. */
+  serverFailover?: boolean
+  /** Persist the standby origin and its one-time authorization account. */
+  saveFallbackServer(input: { fallbackBaseUrl?: string; fallbackAccount?: string; fallbackPassword?: string }): Promise<boolean>
 
   loadScheduleTasks(): Promise<void>
   deleteScheduleTask(sessionId: string, id: string): Promise<boolean>

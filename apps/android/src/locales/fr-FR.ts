@@ -213,7 +213,7 @@ const frFR = {
   },
   settings: {
     appearance: "Apparence",
-    title: "Paramètres", thisPhone: "Ce téléphone", androidDevice: "Appareil Android", connection: "Connexion", server: "Serveur", account: "Compte", loginMethod: "Méthode de connexion", protocol: "Protocole", notConfigured: "Non configuré", notSignedIn: "Non connecté",
+    title: "Paramètres", thisPhone: "Ce téléphone", androidDevice: "Appareil Android", connection: "Connexion", server: "Serveur", account: "Compte", loginMethod: "Méthode de connexion", protocol: "Protocole", notConfigured: "Non configuré", notSignedIn: "Non connecté", fallbackServer: 'Serveur de secours', fallbackAccount: 'Compte de secours', fallbackPassword: 'Mot de passe de secours', saveFallback: 'Enregistrer le serveur de secours', fallbackNote: "Utilisé automatiquement lorsque le serveur principal reste injoignable. Cet appareil doit y être autorisé une fois.", fallbackSameAsPrimary: 'Le serveur de secours doit être différent du serveur principal.', activeServer: 'Connexion active', fallbackBadge: 'secours',
     languageShowAll: "Afficher toutes les langues",
     language: "Langue", languageSystem: "Langue du système", languageChinese: "简体中文", languageEnglish: "English", languageNote: "Avec le système par défaut, l'application suit automatiquement le paramètre de langue Android.",
     compactHistorySaveFailed: "Impossible d'enregistrer le paramètre de conversation compacte",

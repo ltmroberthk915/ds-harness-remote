@@ -213,7 +213,7 @@ const esES = {
   },
   settings: {
     appearance: "Apariencia",
-    title: "Ajustes", thisPhone: "este telefono", androidDevice: "dispositivo Android", connection: "Conexión", server: "Servidor", account: "Cuenta", loginMethod: "Método de inicio de sesión", protocol: "Protocolo", notConfigured: "No configurado", notSignedIn: "No iniciado sesión",
+    title: "Ajustes", thisPhone: "este telefono", androidDevice: "dispositivo Android", connection: "Conexión", server: "Servidor", account: "Cuenta", loginMethod: "Método de inicio de sesión", protocol: "Protocolo", notConfigured: "No configurado", notSignedIn: "No iniciado sesión", fallbackServer: 'Servidor de respaldo', fallbackAccount: 'Cuenta de respaldo', fallbackPassword: 'Contraseña de respaldo', saveFallback: 'Guardar servidor de respaldo', fallbackNote: 'Se usa automáticamente cuando el servidor principal no responde. Este dispositivo debe autorizarse allí una vez.', fallbackSameAsPrimary: 'El servidor de respaldo debe ser distinto del principal.', activeServer: 'Conexión activa', fallbackBadge: 'respaldo',
     languageShowAll: "Mostrar todos los idiomas",
     language: "Idioma", languageSystem: "Seguir el sistema", languageChinese: "简体中文", languageEnglish: "English", languageNote: "Con el sistema predeterminado, la aplicación sigue automáticamente la configuración de idioma de Android.",
     compactHistorySaveFailed: "No se pudo guardar la configuración de conversación compacta",
