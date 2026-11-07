@@ -2976,22 +2976,22 @@ function array4(type, length, lengthType = "count") {
         expectedSize = length(context);
         checkLengthType(expectedSize, sizeTypeError);
       }
-      const body = new BinaryWriter();
+      const body2 = new BinaryWriter();
       for (const item of items) {
-        encodeCommon(item, type, body, context);
+        encodeCommon(item, type, body2, context);
       }
       if (isLengthInBytes) {
         if (isType(length)) {
-          expectedSize = body.bytes;
+          expectedSize = body2.bytes;
         }
-        checkLength(body.bytes, expectedSize, "Argument #1");
+        checkLength(body2.bytes, expectedSize, "Argument #1");
       } else {
         checkLength(expectedSize, items.length, "Argument #1");
       }
       if (isType(length)) {
         length.encode(expectedSize, writer, context);
       }
-      writer.writeBuffer(body.toBuffer());
+      writer.writeBuffer(body2.toBuffer());
     },
     decode(reader, parent) {
       const context = cloneContext(parent);
@@ -3495,18 +3495,18 @@ function prfPreMasterSecret(publicKey, privateKey, curve) {
       throw new Error();
   }
 }
-function hmac2(algorithm, secret, data2) {
-  const hash22 = createHmac(algorithm, secret);
+function hmac2(algorithm, secret2, data2) {
+  const hash22 = createHmac(algorithm, secret2);
   hash22.update(data2);
   return hash22.digest();
 }
-function prfPHash(secret, seed, requestedLegth, algorithm = "sha256") {
+function prfPHash(secret2, seed, requestedLegth, algorithm = "sha256") {
   const totalLength = requestedLegth;
   const bufs = [];
   let Ai = seed;
   do {
-    Ai = hmac2(algorithm, secret, Ai);
-    const output2 = hmac2(algorithm, secret, Buffer.concat([Ai, seed]));
+    Ai = hmac2(algorithm, secret2, Ai);
+    const output2 = hmac2(algorithm, secret2, Buffer.concat([Ai, seed]));
     bufs.push(output2);
     requestedLegth -= output2.length;
   } while (requestedLegth > 0);
@@ -3554,10 +3554,10 @@ function prfVerifyDataServer(masterSecret, handshakes) {
 }
 function prfEncryptionKeys(masterSecret, clientRandom, serverRandom, prfKeyLen, prfIvLen, prfNonceLen, algorithm = "sha256") {
   const size2 = prfKeyLen * 2 + prfIvLen * 2;
-  const secret = masterSecret;
+  const secret2 = masterSecret;
   const seed = Buffer.concat([serverRandom, clientRandom]);
   const keyBlock = prfPHash(
-    secret,
+    secret2,
     Buffer.concat([Buffer.from("key expansion"), seed]),
     size2,
     algorithm
@@ -5364,27 +5364,27 @@ function padL(l) {
   return m ? SCTP_PADDING_MULTIPLE - m : 0;
 }
 function encodeParams(params) {
-  let body = Buffer.from("");
+  let body2 = Buffer.from("");
   let padding = Buffer.from("");
   params.forEach(([type, value]) => {
     const length = value.length + 4;
     const paramHeader = Buffer.alloc(4);
     paramHeader.writeUInt16BE(type, 0);
     paramHeader.writeUInt16BE(length, 2);
-    body = Buffer.concat([body, padding, paramHeader, value]);
+    body2 = Buffer.concat([body2, padding, paramHeader, value]);
     padding = Buffer.concat(
       [...Array(padL(length))].map(() => Buffer.from("\0"))
     );
   });
-  return body;
+  return body2;
 }
-function decodeParams(body) {
+function decodeParams(body2) {
   const params = [];
   let pos = 0;
-  while (pos <= body.length - 4) {
-    const type = body.readUInt16BE(pos);
-    const length = body.readUInt16BE(pos + 2);
-    params.push([type, body.slice(pos + 4, pos + length)]);
+  while (pos <= body2.length - 4) {
+    const type = body2.readUInt16BE(pos);
+    const length = body2.readUInt16BE(pos + 2);
+    params.push([type, body2.slice(pos + 4, pos + length)]);
     pos += length + padL(length);
   }
   return params;
@@ -5426,13 +5426,13 @@ function serializePacket(sourcePort, destinationPort, verificationTag, chunk) {
   header.writeUInt16BE(sourcePort, 0);
   header.writeUInt16BE(destinationPort, 2);
   header.writeUInt32BE(verificationTag, 4);
-  const body = chunk.bytes;
+  const body2 = chunk.bytes;
   const checksum = crc32c(
-    Buffer.concat([header, Buffer.from("\0\0\0\0"), body])
+    Buffer.concat([header, Buffer.from("\0\0\0\0"), body2])
   );
   const checkSumBuf = Buffer.alloc(4);
   checkSumBuf.writeUInt32LE(checksum, 0);
-  const packet = Buffer.concat([header, checkSumBuf, body]);
+  const packet = Buffer.concat([header, checkSumBuf, body2]);
   return packet;
 }
 function enumerate3(arr) {
@@ -7995,14 +7995,14 @@ var init_lib = __esm({
         return encode4(this, _ClientHello.spec);
       }
       toFragment() {
-        const body = this.serialize();
+        const body2 = this.serialize();
         return new FragmentedHandshake(
           this.msgType,
-          body.length,
+          body2.length,
           this.messageSeq,
           0,
-          body.length,
-          body
+          body2.length,
+          body2
         );
       }
     };
@@ -8628,14 +8628,14 @@ var init_lib = __esm({
         return encode8(this, _Certificate.spec);
       }
       toFragment() {
-        const body = this.serialize();
+        const body2 = this.serialize();
         return new FragmentedHandshake(
           this.msgType,
-          body.length,
+          body2.length,
           this.messageSeq,
           0,
-          body.length,
-          body
+          body2.length,
+          body2
         );
       }
     };
@@ -8686,14 +8686,14 @@ var init_lib = __esm({
         return encode10(this, _CertificateVerify.spec);
       }
       toFragment() {
-        const body = this.serialize();
+        const body2 = this.serialize();
         return new FragmentedHandshake(
           this.msgType,
-          body.length,
+          body2.length,
           this.messageSeq,
           0,
-          body.length,
-          body
+          body2.length,
+          body2
         );
       }
     };
@@ -8721,14 +8721,14 @@ var init_lib = __esm({
         return encode11(this, _ClientKeyExchange.spec);
       }
       toFragment() {
-        const body = this.serialize();
+        const body2 = this.serialize();
         return new FragmentedHandshake(
           this.msgType,
-          body.length,
+          body2.length,
           this.messageSeq,
           0,
-          body.length,
-          body
+          body2.length,
+          body2
         );
       }
     };
@@ -8749,14 +8749,14 @@ var init_lib = __esm({
         return this.verifyData;
       }
       toFragment() {
-        const body = this.serialize();
+        const body2 = this.serialize();
         return new FragmentedHandshake(
           this.msgType,
-          body.length,
+          body2.length,
           this.messageSeq,
           0,
-          body.length,
-          body
+          body2.length,
+          body2
         );
       }
     };
@@ -8793,14 +8793,14 @@ var init_lib = __esm({
         return encode12(this, _ServerCertificateRequest.spec);
       }
       toFragment() {
-        const body = this.serialize();
+        const body2 = this.serialize();
         return new FragmentedHandshake(
           this.msgType,
-          body.length,
+          body2.length,
           this.messageSeq,
           0,
-          body.length,
-          body
+          body2.length,
+          body2
         );
       }
     };
@@ -8861,14 +8861,14 @@ var init_lib = __esm({
         });
       }
       toFragment() {
-        const body = this.serialize();
+        const body2 = this.serialize();
         return new FragmentedHandshake(
           this.msgType,
-          body.length,
+          body2.length,
           this.messageSeq,
           0,
-          body.length,
-          body
+          body2.length,
+          body2
         );
       }
     };
@@ -8889,14 +8889,14 @@ var init_lib = __esm({
         return encode14(this, _ServerHelloDone.spec);
       }
       toFragment() {
-        const body = this.serialize();
+        const body2 = this.serialize();
         return new FragmentedHandshake(
           this.msgType,
-          body.length,
+          body2.length,
           this.messageSeq,
           0,
-          body.length,
-          body
+          body2.length,
+          body2
         );
       }
     };
@@ -8956,14 +8956,14 @@ var init_lib = __esm({
         return res;
       }
       toFragment() {
-        const body = this.serialize();
+        const body2 = this.serialize();
         return new FragmentedHandshake(
           this.msgType,
-          body.length,
+          body2.length,
           this.messageSeq,
           0,
-          body.length,
-          body
+          body2.length,
+          body2
         );
       }
     };
@@ -9588,12 +9588,12 @@ var init_lib = __esm({
             startsNewCodedVideoSequence: packets.length === 0 && startsNewSequence,
             obuCount: elements.length
           });
-          const body = elements.flatMap(
+          const body2 = elements.flatMap(
             (element, i) => i < elements.length - 1 ? [leb128encode(element.length), element] : [element]
           );
           packets.push(
             this.buildPacket(
-              Buffer.concat([aggregationHeader, ...body]),
+              Buffer.concat([aggregationHeader, ...body2]),
               rtpTimestamp,
               false
             )
@@ -10034,18 +10034,18 @@ var init_lib = __esm({
             layerId: nalHdr.layerId,
             tid: nalHdr.tid
           });
-          const body = nal.subarray(2);
+          const body2 = nal.subarray(2);
           const fragmentSize = this.maxPayloadSize - 3;
           if (fragmentSize <= 0) {
             throw new Error("invalid H.265 RTP maxPayloadSize for FU");
           }
-          for (let offset = 0; offset < body.length; offset += fragmentSize) {
-            const chunk = body.subarray(
+          for (let offset = 0; offset < body2.length; offset += fragmentSize) {
+            const chunk = body2.subarray(
               offset,
-              Math.min(body.length, offset + fragmentSize)
+              Math.min(body2.length, offset + fragmentSize)
             );
             const isStart = offset === 0;
-            const isEnd = offset + chunk.length >= body.length;
+            const isEnd = offset + chunk.length >= body2.length;
             const fuHeader = Buffer.from([
               (isStart ? 128 : 0) | (isEnd ? 64 : 0) | nalHdr.type & 63
             ]);
@@ -13482,14 +13482,14 @@ var init_lib = __esm({
         };
       }
       toFragment() {
-        const body = this.serialize();
+        const body2 = this.serialize();
         return new FragmentedHandshake(
           this.msgType,
-          body.length,
+          body2.length,
           this.messageSeq,
           0,
-          body.length,
-          body
+          body2.length,
+          body2
         );
       }
     };
@@ -15047,16 +15047,16 @@ var init_lib = __esm({
         return this.rawAttributes.map((attribute) => attribute.type);
       }
       get bytes() {
-        const body = Buffer.concat(
+        const body2 = Buffer.concat(
           this.serializedAttributes.map(
             (attribute) => serializeAttribute(attribute.type, attribute.value)
           )
         );
         const header = Buffer.alloc(8);
         header.writeUInt16BE(this.messageMethod | this.messageClass, 0);
-        header.writeUInt16BE(body.length, 2);
+        header.writeUInt16BE(body2.length, 2);
         header.writeUInt32BE(COOKIE, 4);
-        return Buffer.concat([header, this.transactionId, body]);
+        return Buffer.concat([header, this.transactionId, body2]);
       }
       addMessageIntegrity(key) {
         this.setAttribute("MESSAGE-INTEGRITY", this.messageIntegrity(key));
@@ -18511,16 +18511,16 @@ var init_lib = __esm({
       }
     };
     BaseInitChunk = class extends Chunk {
-      constructor(flags = 0, body) {
-        super(flags, body);
+      constructor(flags = 0, body2) {
+        super(flags, body2);
         this.flags = flags;
-        if (body) {
-          this.initiateTag = body.readUInt32BE(0);
-          this.advertisedRwnd = body.readUInt32BE(4);
-          this.outboundStreams = body.readUInt16BE(8);
-          this.inboundStreams = body.readUInt16BE(10);
-          this.initialTsn = body.readUInt32BE(12);
-          this.params = decodeParams(body.slice(16));
+        if (body2) {
+          this.initiateTag = body2.readUInt32BE(0);
+          this.advertisedRwnd = body2.readUInt32BE(4);
+          this.outboundStreams = body2.readUInt16BE(8);
+          this.inboundStreams = body2.readUInt16BE(10);
+          this.initialTsn = body2.readUInt32BE(12);
+          this.params = decodeParams(body2.slice(16));
         } else {
           this.initiateTag = 0;
           this.advertisedRwnd = 0;
@@ -18538,13 +18538,13 @@ var init_lib = __esm({
       initialTsn;
       params;
       get body() {
-        const body = Buffer.alloc(16);
-        body.writeUInt32BE(this.initiateTag, 0);
-        body.writeUInt32BE(this.advertisedRwnd, 4);
-        body.writeUInt16BE(this.outboundStreams, 8);
-        body.writeUInt16BE(this.inboundStreams, 10);
-        body.writeUInt32BE(this.initialTsn, 12);
-        return Buffer.concat([body, encodeParams(this.params)]);
+        const body2 = Buffer.alloc(16);
+        body2.writeUInt32BE(this.initiateTag, 0);
+        body2.writeUInt32BE(this.advertisedRwnd, 4);
+        body2.writeUInt16BE(this.outboundStreams, 8);
+        body2.writeUInt16BE(this.inboundStreams, 10);
+        body2.writeUInt32BE(this.initialTsn, 12);
+        return Buffer.concat([body2, encodeParams(this.params)]);
       }
     };
     InitChunk = class _InitChunk extends BaseInitChunk {
@@ -18566,14 +18566,14 @@ var init_lib = __esm({
       }
     };
     ForwardTsnChunk = class _ForwardTsnChunk extends Chunk {
-      constructor(flags = 0, body) {
-        super(flags, body);
+      constructor(flags = 0, body2) {
+        super(flags, body2);
         this.flags = flags;
-        if (body) {
-          this.cumulativeTsn = body.readUInt32BE(0);
+        if (body2) {
+          this.cumulativeTsn = body2.readUInt32BE(0);
           let pos = 4;
-          while (pos < body.length) {
-            this.streams.push([body.readUInt16BE(pos), body.readUInt16BE(pos + 2)]);
+          while (pos < body2.length) {
+            this.streams.push([body2.readUInt16BE(pos), body2.readUInt16BE(pos + 2)]);
             pos += 4;
           }
         } else {
@@ -18590,10 +18590,10 @@ var init_lib = __esm({
       set body(_) {
       }
       get body() {
-        const body = Buffer.alloc(4);
-        body.writeUInt32BE(this.cumulativeTsn, 0);
+        const body2 = Buffer.alloc(4);
+        body2.writeUInt32BE(this.cumulativeTsn, 0);
         return Buffer.concat([
-          body,
+          body2,
           ...this.streams.map(([id6, seq]) => {
             const streamBuffer = Buffer.alloc(4);
             streamBuffer.writeUInt16BE(id6, 0);
@@ -18604,15 +18604,15 @@ var init_lib = __esm({
       }
     };
     DataChunk = class _DataChunk extends Chunk {
-      constructor(flags = 0, body) {
-        super(flags, body);
+      constructor(flags = 0, body2) {
+        super(flags, body2);
         this.flags = flags;
-        if (body) {
-          this.tsn = body.readUInt32BE(0);
-          this.streamId = body.readUInt16BE(4);
-          this.streamSeqNum = body.readUInt16BE(6);
-          this.protocol = body.readUInt32BE(8);
-          this.userData = body.slice(12);
+        if (body2) {
+          this.tsn = body2.readUInt32BE(0);
+          this.streamId = body2.readUInt16BE(4);
+          this.streamSeqNum = body2.readUInt16BE(6);
+          this.protocol = body2.readUInt32BE(8);
+          this.userData = body2.slice(12);
         }
       }
       flags;
@@ -18667,11 +18667,11 @@ var init_lib = __esm({
       }
     };
     BaseParamsChunk = class extends Chunk {
-      constructor(flags = 0, body = void 0) {
-        super(flags, body);
+      constructor(flags = 0, body2 = void 0) {
+        super(flags, body2);
         this.flags = flags;
-        if (body) {
-          this.params = decodeParams(body);
+        if (body2) {
+          this.params = decodeParams(body2);
         }
       }
       flags;
@@ -18707,11 +18707,11 @@ var init_lib = __esm({
         return _ErrorChunk.type;
       }
       get descriptions() {
-        return this.params.map(([code, body]) => {
+        return this.params.map(([code, body2]) => {
           const name2 = (Object.entries(_ErrorChunk.CODE).find(
             ([, num]) => num === code
           ) || [])[0];
-          return { name: name2, body };
+          return { name: name2, body: body2 };
         });
       }
     };
@@ -18734,21 +18734,21 @@ var init_lib = __esm({
       }
     };
     SackChunk = class _SackChunk extends Chunk {
-      constructor(flags = 0, body) {
-        super(flags, body);
+      constructor(flags = 0, body2) {
+        super(flags, body2);
         this.flags = flags;
-        if (body) {
-          this.cumulativeTsn = body.readUInt32BE(0);
-          this.advertisedRwnd = body.readUInt32BE(4);
-          const nbGaps = body.readUInt16BE(8);
-          const nbDuplicates = body.readUInt16BE(10);
+        if (body2) {
+          this.cumulativeTsn = body2.readUInt32BE(0);
+          this.advertisedRwnd = body2.readUInt32BE(4);
+          const nbGaps = body2.readUInt16BE(8);
+          const nbDuplicates = body2.readUInt16BE(10);
           let pos = 12;
           [...Array(nbGaps)].forEach(() => {
-            this.gaps.push([body.readUInt16BE(pos), body.readUInt16BE(pos + 2)]);
+            this.gaps.push([body2.readUInt16BE(pos), body2.readUInt16BE(pos + 2)]);
             pos += 4;
           });
           [...Array(nbDuplicates)].forEach(() => {
-            this.duplicates.push(body.readUInt32BE(pos));
+            this.duplicates.push(body2.readUInt32BE(pos));
             pos += 4;
           });
         }
@@ -18793,11 +18793,11 @@ var init_lib = __esm({
       }
     };
     ShutdownChunk = class _ShutdownChunk extends Chunk {
-      constructor(flags = 0, body) {
-        super(flags, body);
+      constructor(flags = 0, body2) {
+        super(flags, body2);
         this.flags = flags;
-        if (body) {
-          this.cumulativeTsn = body.readUInt32BE(0);
+        if (body2) {
+          this.cumulativeTsn = body2.readUInt32BE(0);
         }
       }
       flags;
@@ -18807,9 +18807,9 @@ var init_lib = __esm({
       }
       cumulativeTsn = 0;
       get body() {
-        const body = Buffer.alloc(4);
-        body.writeUInt32BE(this.cumulativeTsn, 0);
-        return body;
+        const body2 = Buffer.alloc(4);
+        body2.writeUInt32BE(this.cumulativeTsn, 0);
+        return body2;
       }
     };
     ShutdownAckChunk = class _ShutdownAckChunk extends Chunk {
@@ -19378,10 +19378,10 @@ var init_lib = __esm({
             {
               if (this.associationState != 4) return;
               const reconfig = chunk;
-              for (const [type, body] of reconfig.params) {
+              for (const [type, body2] of reconfig.params) {
                 const target3 = RECONFIG_PARAM_BY_TYPES[type];
                 if (target3) {
-                  await this.receiveReconfigParam(target3.parse(body));
+                  await this.receiveReconfigParam(target3.parse(body2));
                 }
               }
             }
@@ -50855,7 +50855,7 @@ function generateRecordCheck(doc, ctx, schema, accessor) {
   }, `return INVALID;`);
   return outputVar;
 }
-function emitOwnKeys(doc, ctx, accessor, kVar, body, onSymbol) {
+function emitOwnKeys(doc, ctx, accessor, kVar, body2, onSymbol) {
   const propIsEnumerableConst = addConstant(ctx, Object.prototype.propertyIsEnumerable);
   const symsVar = newVar(ctx);
   const keysVar = newVar(ctx);
@@ -50866,7 +50866,7 @@ function emitOwnKeys(doc, ctx, accessor, kVar, body, onSymbol) {
   doc.indented((d) => {
     d.write(`const ${kVar} = ${keysVar}[${iVar}];`);
     d.write(`if (${kVar} === "__proto__" || !${propIsEnumerableConst}.call(${accessor}, ${kVar})) continue;`);
-    body(d);
+    body2(d);
   });
   doc.write(`}`);
   doc.write(`for (let ${iVar} = 0; ${iVar} < ${symsVar}.length; ${iVar}++) {`);
@@ -50876,7 +50876,7 @@ function emitOwnKeys(doc, ctx, accessor, kVar, body, onSymbol) {
     if (onSymbol)
       d.write(onSymbol);
     else
-      body(d);
+      body2(d);
   });
   doc.write(`}`);
 }
@@ -52145,13 +52145,13 @@ function initializeContext(params) {
     external: params?.external ?? void 0
   };
 }
-function handleUnrepresentable(schema, ctx, json2, params, message) {
+function handleUnrepresentable(schema, ctx, json3, params, message) {
   const result = typeof ctx.unrepresentable === "function" ? ctx.unrepresentable({ zodSchema: schema, path: params.path, message }) : ctx.unrepresentable;
   if (result === "any")
     return false;
   if (result === void 0 || result === "throw")
     throw new Error(message);
-  Object.assign(json2, result);
+  Object.assign(json3, result);
   return true;
 }
 function processSchema(schema, ctx, _params = { path: [], schemaPath: [] }) {
@@ -52387,12 +52387,12 @@ function foldObjects(members2) {
   }
   return folded;
 }
-function foldIntersection(json2) {
-  const allOf = json2.allOf;
+function foldIntersection(json3) {
+  const allOf = json3.allOf;
   if (!Array.isArray(allOf) || allOf.length < 2)
     return;
   for (const key of FOLDABLE_KEYS)
-    if (key in json2)
+    if (key in json3)
       return;
   const unions = allOf.filter((m) => UNION_KEYS.some((k) => Array.isArray(m[k])));
   let folded = null;
@@ -52411,8 +52411,8 @@ function foldIntersection(json2) {
   }
   if (!folded)
     return;
-  delete json2.allOf;
-  assignProps(json2, folded);
+  delete json3.allOf;
+  assignProps(json3, folded);
 }
 function finalize(ctx, schema) {
   const root = ctx.seen.get(schema);
@@ -52494,20 +52494,20 @@ function finalize(ctx, schema) {
     if (ctx.intersections.length) {
       const carriers = /* @__PURE__ */ new Map();
       for (const seen of ctx.seen.values()) {
-        for (const json2 of [seen.schema, seen.def]) {
-          const allOf = json2?.allOf;
+        for (const json3 of [seen.schema, seen.def]) {
+          const allOf = json3?.allOf;
           if (!Array.isArray(allOf))
             continue;
           const existing = carriers.get(allOf);
           if (existing)
-            existing.push(json2);
+            existing.push(json3);
           else
-            carriers.set(allOf, [json2]);
+            carriers.set(allOf, [json3]);
         }
       }
       for (const allOf of ctx.intersections) {
-        for (const json2 of carriers.get(allOf) ?? [])
-          foldIntersection(json2);
+        for (const json3 of carriers.get(allOf) ?? [])
+          foldIntersection(json3);
       }
     }
   }
@@ -52742,29 +52742,29 @@ var exactPatterns = /* @__PURE__ */ new Map([
 ]);
 var exactPattern = (p) => exactPatterns.get(p) ?? p;
 var stringProcessor = (schema, ctx, _json, _params) => {
-  const json2 = _json;
-  json2.type = "string";
+  const json3 = _json;
+  json3.type = "string";
   const { minimum, maximum, format, patterns, contentEncoding, laxFormat } = aggregateChecks(schema);
   if (typeof minimum === "number")
-    json2.minLength = minimum;
+    json3.minLength = minimum;
   if (typeof maximum === "number")
-    json2.maxLength = maximum;
+    json3.maxLength = maximum;
   if (format) {
-    json2.format = formatMap[format] ?? format;
-    if (json2.format === "")
-      delete json2.format;
+    json3.format = formatMap[format] ?? format;
+    if (json3.format === "")
+      delete json3.format;
     if (format === "time" || laxFormat) {
-      delete json2.format;
+      delete json3.format;
     }
   }
   if (contentEncoding)
-    json2.contentEncoding = contentEncoding;
+    json3.contentEncoding = contentEncoding;
   if (patterns && patterns.size > 0) {
     const patternList = [...patterns].map(exactPattern);
     if (patternList.length === 1)
-      json2.pattern = patternList[0].source;
+      json3.pattern = patternList[0].source;
     else if (patternList.length > 1) {
-      json2.allOf = [
+      json3.allOf = [
         ...patternList.map((regex) => ({
           ...ctx.target === "draft-07" || ctx.target === "draft-04" || ctx.target === "openapi-3.0" ? { type: "string" } : {},
           pattern: regex.source
@@ -52774,31 +52774,31 @@ var stringProcessor = (schema, ctx, _json, _params) => {
   }
 };
 var numberProcessor = (schema, ctx, _json, params) => {
-  const json2 = _json;
+  const json3 = _json;
   const { minimum, maximum, multipleOf, exclusiveMaximum, exclusiveMinimum, isInt } = aggregateChecks(schema);
-  json2.type = isInt ? "integer" : "number";
+  json3.type = isInt ? "integer" : "number";
   const exMin = typeof exclusiveMinimum === "number" && exclusiveMinimum >= (minimum ?? Number.NEGATIVE_INFINITY);
   const exMax = typeof exclusiveMaximum === "number" && exclusiveMaximum <= (maximum ?? Number.POSITIVE_INFINITY);
   const legacy = ctx.target === "draft-04" || ctx.target === "openapi-3.0";
   if (exMin) {
     if (legacy) {
-      json2.minimum = exclusiveMinimum;
-      json2.exclusiveMinimum = true;
+      json3.minimum = exclusiveMinimum;
+      json3.exclusiveMinimum = true;
     } else {
-      json2.exclusiveMinimum = exclusiveMinimum;
+      json3.exclusiveMinimum = exclusiveMinimum;
     }
   } else if (typeof minimum === "number") {
-    json2.minimum = minimum;
+    json3.minimum = minimum;
   }
   if (exMax) {
     if (legacy) {
-      json2.maximum = exclusiveMaximum;
-      json2.exclusiveMaximum = true;
+      json3.maximum = exclusiveMaximum;
+      json3.exclusiveMaximum = true;
     } else {
-      json2.exclusiveMaximum = exclusiveMaximum;
+      json3.exclusiveMaximum = exclusiveMaximum;
     }
   } else if (typeof maximum === "number") {
-    json2.maximum = maximum;
+    json3.maximum = maximum;
   }
   if (multipleOf) {
     const divisors = /* @__PURE__ */ new Set();
@@ -52806,75 +52806,75 @@ var numberProcessor = (schema, ctx, _json, params) => {
       if (Number.isFinite(divisor) && divisor !== 0)
         divisors.add(Math.abs(divisor));
       else
-        handleUnrepresentable(schema, ctx, json2, params, `A multipleOf divisor of ${divisor} cannot be represented in JSON Schema`);
+        handleUnrepresentable(schema, ctx, json3, params, `A multipleOf divisor of ${divisor} cannot be represented in JSON Schema`);
     }
     const [first2, ...rest] = divisors;
     if (first2 !== void 0)
-      json2.multipleOf = first2;
+      json3.multipleOf = first2;
     if (rest.length)
-      json2.allOf = [...json2.allOf ?? [], ...rest.map((m) => ({ multipleOf: m }))];
+      json3.allOf = [...json3.allOf ?? [], ...rest.map((m) => ({ multipleOf: m }))];
   }
 };
-var booleanProcessor = (_schema, _ctx, json2, _params) => {
-  json2.type = "boolean";
+var booleanProcessor = (_schema, _ctx, json3, _params) => {
+  json3.type = "boolean";
 };
-var bigintProcessor = (schema, ctx, json2, params) => {
-  handleUnrepresentable(schema, ctx, json2, params, "BigInt cannot be represented in JSON Schema");
+var bigintProcessor = (schema, ctx, json3, params) => {
+  handleUnrepresentable(schema, ctx, json3, params, "BigInt cannot be represented in JSON Schema");
 };
-var symbolProcessor = (schema, ctx, json2, params) => {
-  handleUnrepresentable(schema, ctx, json2, params, "Symbols cannot be represented in JSON Schema");
+var symbolProcessor = (schema, ctx, json3, params) => {
+  handleUnrepresentable(schema, ctx, json3, params, "Symbols cannot be represented in JSON Schema");
 };
-var nullProcessor = (_schema, ctx, json2, _params) => {
+var nullProcessor = (_schema, ctx, json3, _params) => {
   if (ctx.target === "openapi-3.0") {
-    json2.type = "string";
-    json2.nullable = true;
-    json2.enum = [null];
+    json3.type = "string";
+    json3.nullable = true;
+    json3.enum = [null];
   } else {
-    json2.type = "null";
+    json3.type = "null";
   }
 };
-var undefinedProcessor = (schema, ctx, json2, params) => {
-  handleUnrepresentable(schema, ctx, json2, params, "Undefined cannot be represented in JSON Schema");
+var undefinedProcessor = (schema, ctx, json3, params) => {
+  handleUnrepresentable(schema, ctx, json3, params, "Undefined cannot be represented in JSON Schema");
 };
-var voidProcessor = (schema, ctx, json2, params) => {
-  handleUnrepresentable(schema, ctx, json2, params, "Void cannot be represented in JSON Schema");
+var voidProcessor = (schema, ctx, json3, params) => {
+  handleUnrepresentable(schema, ctx, json3, params, "Void cannot be represented in JSON Schema");
 };
-var neverProcessor = (_schema, _ctx, json2, _params) => {
-  json2.not = {};
+var neverProcessor = (_schema, _ctx, json3, _params) => {
+  json3.not = {};
 };
 var anyProcessor = (_schema, _ctx, _json, _params) => {
 };
 var unknownProcessor = (_schema, _ctx, _json, _params) => {
 };
-var dateProcessor = (schema, ctx, json2, params) => {
-  handleUnrepresentable(schema, ctx, json2, params, "Date cannot be represented in JSON Schema");
+var dateProcessor = (schema, ctx, json3, params) => {
+  handleUnrepresentable(schema, ctx, json3, params, "Date cannot be represented in JSON Schema");
 };
-var enumProcessor = (schema, _ctx, json2, _params) => {
+var enumProcessor = (schema, _ctx, json3, _params) => {
   const def = schema._zod.def;
   const values = getEnumValues(def.entries);
   if (values.length === 0) {
-    json2.not = {};
+    json3.not = {};
     return;
   }
   if (values.every((v) => typeof v === "number"))
-    json2.type = "number";
+    json3.type = "number";
   if (values.every((v) => typeof v === "string"))
-    json2.type = "string";
-  json2.enum = values;
+    json3.type = "string";
+  json3.enum = values;
 };
-var literalProcessor = (schema, ctx, json2, params) => {
+var literalProcessor = (schema, ctx, json3, params) => {
   const def = schema._zod.def;
   if (def.values.length === 0) {
-    json2.not = {};
+    json3.not = {};
     return;
   }
   const vals = [];
   for (const val of def.values) {
     if (val === void 0) {
-      if (handleUnrepresentable(schema, ctx, json2, params, "Literal `undefined` cannot be represented in JSON Schema"))
+      if (handleUnrepresentable(schema, ctx, json3, params, "Literal `undefined` cannot be represented in JSON Schema"))
         return;
     } else if (typeof val === "bigint") {
-      if (handleUnrepresentable(schema, ctx, json2, params, "BigInt literals cannot be represented in JSON Schema"))
+      if (handleUnrepresentable(schema, ctx, json3, params, "BigInt literals cannot be represented in JSON Schema"))
         return;
       vals.push(Number(val));
     } else {
@@ -52884,37 +52884,37 @@ var literalProcessor = (schema, ctx, json2, params) => {
   if (vals.length === 0) {
   } else if (vals.length === 1) {
     const val = vals[0];
-    json2.type = val === null ? "null" : typeof val;
+    json3.type = val === null ? "null" : typeof val;
     if (ctx.target === "draft-04" || ctx.target === "openapi-3.0") {
-      json2.enum = [val];
+      json3.enum = [val];
     } else {
-      json2.const = val;
+      json3.const = val;
     }
   } else {
     if (vals.every((v) => typeof v === "number"))
-      json2.type = "number";
+      json3.type = "number";
     if (vals.every((v) => typeof v === "string"))
-      json2.type = "string";
+      json3.type = "string";
     if (vals.every((v) => typeof v === "boolean"))
-      json2.type = "boolean";
+      json3.type = "boolean";
     if (vals.every((v) => v === null))
-      json2.type = "null";
-    json2.enum = vals;
+      json3.type = "null";
+    json3.enum = vals;
   }
 };
-var nanProcessor = (schema, ctx, json2, params) => {
-  handleUnrepresentable(schema, ctx, json2, params, "NaN cannot be represented in JSON Schema");
+var nanProcessor = (schema, ctx, json3, params) => {
+  handleUnrepresentable(schema, ctx, json3, params, "NaN cannot be represented in JSON Schema");
 };
-var templateLiteralProcessor = (schema, _ctx, json2, _params) => {
-  const _json = json2;
+var templateLiteralProcessor = (schema, _ctx, json3, _params) => {
+  const _json = json3;
   const pattern = schema._zod.pattern;
   if (!pattern)
     throw new Error("Pattern not found in template literal");
   _json.type = "string";
   _json.pattern = pattern.source;
 };
-var fileProcessor = (schema, _ctx, json2, _params) => {
-  const _json = json2;
+var fileProcessor = (schema, _ctx, json3, _params) => {
+  const _json = json3;
   _json.type = "string";
   _json.format = "binary";
   _json.contentEncoding = "binary";
@@ -52932,34 +52932,34 @@ var fileProcessor = (schema, _ctx, json2, _params) => {
   else
     _json.anyOf = mime.map((m) => ({ contentMediaType: m }));
 };
-var successProcessor = (_schema, _ctx, json2, _params) => {
-  json2.type = "boolean";
+var successProcessor = (_schema, _ctx, json3, _params) => {
+  json3.type = "boolean";
 };
-var customProcessor = (schema, ctx, json2, params) => {
-  handleUnrepresentable(schema, ctx, json2, params, "Custom types cannot be represented in JSON Schema");
+var customProcessor = (schema, ctx, json3, params) => {
+  handleUnrepresentable(schema, ctx, json3, params, "Custom types cannot be represented in JSON Schema");
 };
-var functionProcessor = (schema, ctx, json2, params) => {
-  handleUnrepresentable(schema, ctx, json2, params, "Function types cannot be represented in JSON Schema");
+var functionProcessor = (schema, ctx, json3, params) => {
+  handleUnrepresentable(schema, ctx, json3, params, "Function types cannot be represented in JSON Schema");
 };
-var transformProcessor = (schema, ctx, json2, params) => {
-  handleUnrepresentable(schema, ctx, json2, params, "Transforms cannot be represented in JSON Schema");
+var transformProcessor = (schema, ctx, json3, params) => {
+  handleUnrepresentable(schema, ctx, json3, params, "Transforms cannot be represented in JSON Schema");
 };
-var mapProcessor = (schema, ctx, json2, params) => {
-  handleUnrepresentable(schema, ctx, json2, params, "Map cannot be represented in JSON Schema");
+var mapProcessor = (schema, ctx, json3, params) => {
+  handleUnrepresentable(schema, ctx, json3, params, "Map cannot be represented in JSON Schema");
 };
-var setProcessor = (schema, ctx, json2, params) => {
-  handleUnrepresentable(schema, ctx, json2, params, "Set cannot be represented in JSON Schema");
+var setProcessor = (schema, ctx, json3, params) => {
+  handleUnrepresentable(schema, ctx, json3, params, "Set cannot be represented in JSON Schema");
 };
 var arrayProcessor = (schema, ctx, _json, params) => {
-  const json2 = _json;
+  const json3 = _json;
   const def = schema._zod.def;
   const { minimum, maximum } = aggregateChecks(schema);
   if (typeof minimum === "number")
-    json2.minItems = minimum;
+    json3.minItems = minimum;
   if (typeof maximum === "number")
-    json2.maxItems = maximum;
-  json2.type = "array";
-  json2.items = processSchema(def.element, ctx, {
+    json3.maxItems = maximum;
+  json3.type = "array";
+  json3.items = processSchema(def.element, ctx, {
     ...params,
     path: [...params.path, "items"]
   });
@@ -52975,17 +52975,17 @@ function inputOptin(schema) {
   return schema._zod.optin;
 }
 var objectProcessor = (schema, ctx, _json, params) => {
-  const json2 = _json;
+  const json3 = _json;
   const def = schema._zod.def;
   const shape = def.shape;
   const symbolKeys = Object.getOwnPropertySymbols(shape);
-  if (symbolKeys.length && handleUnrepresentable(schema, ctx, json2, params, "Symbol keys cannot be represented in JSON Schema")) {
+  if (symbolKeys.length && handleUnrepresentable(schema, ctx, json3, params, "Symbol keys cannot be represented in JSON Schema")) {
     return;
   }
-  json2.type = "object";
-  json2.properties = {};
+  json3.type = "object";
+  json3.properties = {};
   for (const key in shape) {
-    assignProp(json2.properties, key, processSchema(shape[key], ctx, {
+    assignProp(json3.properties, key, processSchema(shape[key], ctx, {
       ...params,
       path: [...params.path, "properties", key]
     }));
@@ -52998,21 +52998,21 @@ var objectProcessor = (schema, ctx, _json, params) => {
     }
   }
   if (requiredKeys.length > 0) {
-    json2.required = requiredKeys;
+    json3.required = requiredKeys;
   }
   if (def.catchall?._zod.def.type === "never") {
-    json2.additionalProperties = false;
+    json3.additionalProperties = false;
   } else if (!def.catchall) {
     if (ctx.io === "output")
-      json2.additionalProperties = false;
+      json3.additionalProperties = false;
   } else if (def.catchall) {
-    json2.additionalProperties = processSchema(def.catchall, ctx, {
+    json3.additionalProperties = processSchema(def.catchall, ctx, {
       ...params,
       path: [...params.path, "additionalProperties"]
     });
   }
 };
-var unionProcessor = (schema, ctx, json2, params) => {
+var unionProcessor = (schema, ctx, json3, params) => {
   const def = schema._zod.def;
   const isExclusive = def.inclusive === false;
   const options = def.options.map((x, i) => processSchema(x, ctx, {
@@ -53020,12 +53020,12 @@ var unionProcessor = (schema, ctx, json2, params) => {
     path: [...params.path, isExclusive ? "oneOf" : "anyOf", i]
   }));
   if (isExclusive) {
-    json2.oneOf = options;
+    json3.oneOf = options;
   } else {
-    json2.anyOf = options;
+    json3.anyOf = options;
   }
 };
-var intersectionProcessor = (schema, ctx, json2, params) => {
+var intersectionProcessor = (schema, ctx, json3, params) => {
   const def = schema._zod.def;
   const a = processSchema(def.left, ctx, {
     ...params,
@@ -53040,13 +53040,13 @@ var intersectionProcessor = (schema, ctx, json2, params) => {
     ...isSimpleIntersection(a) ? a.allOf : [a],
     ...isSimpleIntersection(b) ? b.allOf : [b]
   ];
-  json2.allOf = allOf;
+  json3.allOf = allOf;
   ctx.intersections.push(allOf);
 };
 var tupleProcessor = (schema, ctx, _json, params) => {
-  const json2 = _json;
+  const json3 = _json;
   const def = schema._zod.def;
-  json2.type = "array";
+  json3.type = "array";
   const prefixPath = ctx.target === "draft-2020-12" ? "prefixItems" : "items";
   const restPath = ctx.target === "draft-2020-12" ? "items" : ctx.target === "openapi-3.0" ? "items" : "additionalItems";
   const prefixItems = def.items.map((x, i) => processSchema(x, ctx, {
@@ -53068,70 +53068,70 @@ var tupleProcessor = (schema, ctx, _json, params) => {
   const maxItems = def.items.length;
   const isClosed = !def.rest;
   if (ctx.target === "draft-2020-12") {
-    json2.prefixItems = prefixItems;
+    json3.prefixItems = prefixItems;
     if (isClosed) {
-      json2.items = false;
+      json3.items = false;
     } else if (rest) {
-      json2.items = rest;
+      json3.items = rest;
     }
     if (minItems > 0)
-      json2.minItems = minItems;
+      json3.minItems = minItems;
     if (isClosed)
-      json2.maxItems = maxItems;
+      json3.maxItems = maxItems;
   } else if (ctx.target === "openapi-3.0") {
-    json2.items = {
+    json3.items = {
       anyOf: prefixItems
     };
     if (rest) {
-      json2.items.anyOf.push(rest);
+      json3.items.anyOf.push(rest);
     }
     if (minItems > 0)
-      json2.minItems = minItems;
+      json3.minItems = minItems;
     if (isClosed)
-      json2.maxItems = maxItems;
+      json3.maxItems = maxItems;
   } else {
-    json2.items = prefixItems;
+    json3.items = prefixItems;
     if (isClosed) {
-      json2.additionalItems = false;
+      json3.additionalItems = false;
     } else if (rest) {
-      json2.additionalItems = rest;
+      json3.additionalItems = rest;
     }
     if (minItems > 0)
-      json2.minItems = minItems;
+      json3.minItems = minItems;
     if (isClosed)
-      json2.maxItems = maxItems;
+      json3.maxItems = maxItems;
   }
   const { minimum, maximum } = aggregateChecks(schema);
   if (typeof minimum === "number")
-    json2.minItems = minimum;
+    json3.minItems = minimum;
   if (typeof maximum === "number")
-    json2.maxItems = maximum;
+    json3.maxItems = maximum;
 };
-function stringifyKeyNames(bySchema, json2, visited) {
-  if (json2.$ref) {
-    if (visited.has(json2))
-      return json2;
-    visited.add(json2);
-    const def = bySchema.get(json2)?.def;
+function stringifyKeyNames(bySchema, json3, visited) {
+  if (json3.$ref) {
+    if (visited.has(json3))
+      return json3;
+    visited.add(json3);
+    const def = bySchema.get(json3)?.def;
     if (!def)
-      return json2;
+      return json3;
     const inlined = stringifyKeyNames(bySchema, def, visited);
-    return inlined === def ? json2 : inlined;
+    return inlined === def ? json3 : inlined;
   }
   for (const keyword of ["anyOf", "oneOf"]) {
-    const branches = json2[keyword];
+    const branches = json3[keyword];
     if (!Array.isArray(branches))
       continue;
     const mapped = branches.map((branch) => stringifyKeyNames(bySchema, branch, visited));
     if (mapped.some((branch, i) => branch !== branches[i]))
-      json2 = { ...json2, [keyword]: mapped };
+      json3 = { ...json3, [keyword]: mapped };
   }
-  const types22 = Array.isArray(json2.type) ? json2.type : [json2.type];
+  const types22 = Array.isArray(json3.type) ? json3.type : [json3.type];
   const numericType = !types22.includes("string") && types22.some((t) => t === "number" || t === "integer");
-  const values = json2.enum ?? (json2.const !== void 0 ? [json2.const] : void 0);
+  const values = json3.enum ?? (json3.const !== void 0 ? [json3.const] : void 0);
   if (!numericType && !values?.some((v) => typeof v === "number"))
-    return json2;
-  const { minimum, maximum, exclusiveMinimum, exclusiveMaximum, multipleOf, format, id: id6, ...rest } = json2;
+    return json3;
+  const { minimum, maximum, exclusiveMinimum, exclusiveMaximum, multipleOf, format, id: id6, ...rest } = json3;
   if (rest.enum)
     rest.enum = rest.enum.map((v) => typeof v === "number" ? String(v) : v);
   else if (typeof rest.const === "number")
@@ -53171,9 +53171,9 @@ function rewriteKeyNames(ctx) {
   }
 }
 var recordProcessor = (schema, ctx, _json, params) => {
-  const json2 = _json;
+  const json3 = _json;
   const def = schema._zod.def;
-  json2.type = "object";
+  json3.type = "object";
   const keyType = def.keyType;
   const patterns = aggregateChecks(keyType).patterns;
   if (def.mode === "loose" && patterns && patterns.size > 0) {
@@ -53181,13 +53181,13 @@ var recordProcessor = (schema, ctx, _json, params) => {
       ...params,
       path: [...params.path, "patternProperties", "*"]
     });
-    json2.patternProperties = {};
+    json3.patternProperties = {};
     for (const pattern of patterns) {
-      assignProp(json2.patternProperties, exactPattern(pattern).source, valueSchema);
+      assignProp(json3.patternProperties, exactPattern(pattern).source, valueSchema);
     }
   } else {
     if (ctx.target === "draft-07" || ctx.target === "draft-2020-12") {
-      json2.propertyNames = processSchema(def.keyType, ctx, {
+      json3.propertyNames = processSchema(def.keyType, ctx, {
         ...params,
         path: [...params.path, "propertyNames"]
       });
@@ -53199,7 +53199,7 @@ var recordProcessor = (schema, ctx, _json, params) => {
       }
       pending.push(schema);
     }
-    json2.additionalProperties = processSchema(def.valueType, ctx, {
+    json3.additionalProperties = processSchema(def.valueType, ctx, {
       ...params,
       path: [...params.path, "additionalProperties"]
     });
@@ -53209,19 +53209,19 @@ var recordProcessor = (schema, ctx, _json, params) => {
   if (keyValues && !def.partial && !omittableOnInput) {
     const validKeyValues = [...keyValues].filter((v) => typeof v === "string" || typeof v === "number");
     if (validKeyValues.length > 0) {
-      json2.required = validKeyValues.map(String);
+      json3.required = validKeyValues.map(String);
     }
   }
 };
-var nullableProcessor = (schema, ctx, json2, params) => {
+var nullableProcessor = (schema, ctx, json3, params) => {
   const def = schema._zod.def;
   const inner = processSchema(def.innerType, ctx, params);
   const seen = ctx.seen.get(schema);
   if (ctx.target === "openapi-3.0") {
     seen.ref = def.innerType;
-    json2.nullable = true;
+    json3.nullable = true;
   } else {
-    json2.anyOf = [inner, { type: "null" }];
+    json3.anyOf = [inner, { type: "null" }];
   }
 };
 var nonoptionalProcessor = (schema, ctx, _json, params) => {
@@ -53231,7 +53231,7 @@ var nonoptionalProcessor = (schema, ctx, _json, params) => {
   seen.ref = def.innerType;
 };
 var UNREPRESENTABLE_DEFAULT = Symbol();
-function serializeDefaultValue(value, schema, ctx, json2, params) {
+function serializeDefaultValue(value, schema, ctx, json3, params) {
   let unrepresentable = false;
   const serialized = JSON.stringify(value, (_, val) => {
     if (typeof val !== "bigint")
@@ -53241,30 +53241,30 @@ function serializeDefaultValue(value, schema, ctx, json2, params) {
   });
   if (!unrepresentable)
     return JSON.parse(serialized);
-  handleUnrepresentable(schema, ctx, json2, params, "BigInt defaults cannot be represented in JSON Schema");
+  handleUnrepresentable(schema, ctx, json3, params, "BigInt defaults cannot be represented in JSON Schema");
   return UNREPRESENTABLE_DEFAULT;
 }
-var defaultProcessor = (schema, ctx, json2, params) => {
+var defaultProcessor = (schema, ctx, json3, params) => {
   const def = schema._zod.def;
   processSchema(def.innerType, ctx, params);
   const seen = ctx.seen.get(schema);
   seen.ref = def.innerType;
-  const value = serializeDefaultValue(def.defaultValue, schema, ctx, json2, params);
+  const value = serializeDefaultValue(def.defaultValue, schema, ctx, json3, params);
   if (value !== UNREPRESENTABLE_DEFAULT)
-    json2.default = value;
+    json3.default = value;
 };
-var prefaultProcessor = (schema, ctx, json2, params) => {
+var prefaultProcessor = (schema, ctx, json3, params) => {
   const def = schema._zod.def;
   processSchema(def.innerType, ctx, params);
   const seen = ctx.seen.get(schema);
   seen.ref = def.innerType;
   if (ctx.io !== "input")
     return;
-  const value = serializeDefaultValue(def.defaultValue, schema, ctx, json2, params);
+  const value = serializeDefaultValue(def.defaultValue, schema, ctx, json3, params);
   if (value !== UNREPRESENTABLE_DEFAULT)
-    json2._prefault = value;
+    json3._prefault = value;
 };
-var catchProcessor = (schema, ctx, json2, params) => {
+var catchProcessor = (schema, ctx, json3, params) => {
   const def = schema._zod.def;
   processSchema(def.innerType, ctx, params);
   const seen = ctx.seen.get(schema);
@@ -53273,10 +53273,10 @@ var catchProcessor = (schema, ctx, json2, params) => {
   try {
     catchValue = def.catchValue(void 0);
   } catch {
-    handleUnrepresentable(schema, ctx, json2, params, "Dynamic catch values are not supported in JSON Schema");
+    handleUnrepresentable(schema, ctx, json3, params, "Dynamic catch values are not supported in JSON Schema");
     return;
   }
-  json2.default = catchValue;
+  json3.default = catchValue;
 };
 var pipeProcessor = (schema, ctx, _json, params) => {
   const def = schema._zod.def;
@@ -53286,12 +53286,12 @@ var pipeProcessor = (schema, ctx, _json, params) => {
   const seen = ctx.seen.get(schema);
   seen.ref = innerType;
 };
-var readonlyProcessor = (schema, ctx, json2, params) => {
+var readonlyProcessor = (schema, ctx, json3, params) => {
   const def = schema._zod.def;
   processSchema(def.innerType, ctx, params);
   const seen = ctx.seen.get(schema);
   seen.ref = def.innerType;
-  json2.readOnly = true;
+  json3.readOnly = true;
 };
 var promiseProcessor = (schema, ctx, _json, params) => {
   const def = schema._zod.def;
@@ -53933,7 +53933,7 @@ var _ZodString = /* @__PURE__ */ $constructor(
   (inst, def) => {
     $ZodString.init(inst, def);
     ZodType.init(inst, def);
-    inst._zod.processJSONSchema = (ctx, json2, params) => stringProcessor(inst, ctx, json2, params);
+    inst._zod.processJSONSchema = (ctx, json3, params) => stringProcessor(inst, ctx, json3, params);
   },
   /* @__PURE__ */ util_exports.derived({
     format: (inst) => aggregateChecks(inst).format ?? null,
@@ -54292,7 +54292,7 @@ var ZodNumber = /* @__PURE__ */ $constructor(
   (inst, def) => {
     $ZodNumber.init(inst, def);
     ZodType.init(inst, def);
-    inst._zod.processJSONSchema = (ctx, json2, params) => numberProcessor(inst, ctx, json2, params);
+    inst._zod.processJSONSchema = (ctx, json3, params) => numberProcessor(inst, ctx, json3, params);
     inst.isFinite = true;
   },
   /* @__PURE__ */ util_exports.derived({
@@ -54382,7 +54382,7 @@ function uint32(params) {
 var ZodBoolean = /* @__PURE__ */ $constructor("ZodBoolean", (inst, def) => {
   $ZodBoolean.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => booleanProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => booleanProcessor(inst, ctx, json3, params);
 });
 function boolean2(params) {
   return _boolean(ZodBoolean, params);
@@ -54392,7 +54392,7 @@ var ZodBigInt = /* @__PURE__ */ $constructor(
   (inst, def) => {
     $ZodBigInt.init(inst, def);
     ZodType.init(inst, def);
-    inst._zod.processJSONSchema = (ctx, json2, params) => bigintProcessor(inst, ctx, json2, params);
+    inst._zod.processJSONSchema = (ctx, json3, params) => bigintProcessor(inst, ctx, json3, params);
   },
   /* @__PURE__ */ util_exports.derived({
     minValue: (inst) => aggregateChecks(inst).minimum ?? null,
@@ -54450,7 +54450,7 @@ function uint64(params) {
 var ZodSymbol = /* @__PURE__ */ $constructor("ZodSymbol", (inst, def) => {
   $ZodSymbol.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => symbolProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => symbolProcessor(inst, ctx, json3, params);
 });
 function symbol(params) {
   return _symbol(ZodSymbol, params);
@@ -54458,7 +54458,7 @@ function symbol(params) {
 var ZodUndefined = /* @__PURE__ */ $constructor("ZodUndefined", (inst, def) => {
   $ZodUndefined.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => undefinedProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => undefinedProcessor(inst, ctx, json3, params);
 });
 function _undefined3(params) {
   return _undefined2(ZodUndefined, params);
@@ -54466,7 +54466,7 @@ function _undefined3(params) {
 var ZodNull = /* @__PURE__ */ $constructor("ZodNull", (inst, def) => {
   $ZodNull.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => nullProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => nullProcessor(inst, ctx, json3, params);
 });
 function _null3(params) {
   return _null2(ZodNull, params);
@@ -54474,7 +54474,7 @@ function _null3(params) {
 var ZodAny = /* @__PURE__ */ $constructor("ZodAny", (inst, def) => {
   $ZodAny.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => anyProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => anyProcessor(inst, ctx, json3, params);
 });
 function any() {
   return _any(ZodAny);
@@ -54482,7 +54482,7 @@ function any() {
 var ZodUnknown = /* @__PURE__ */ $constructor("ZodUnknown", (inst, def) => {
   $ZodUnknown.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => unknownProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => unknownProcessor(inst, ctx, json3, params);
 });
 function unknown() {
   return _unknown(ZodUnknown);
@@ -54490,7 +54490,7 @@ function unknown() {
 var ZodNever = /* @__PURE__ */ $constructor("ZodNever", (inst, def) => {
   $ZodNever.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => neverProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => neverProcessor(inst, ctx, json3, params);
 });
 function never(params) {
   return _never(ZodNever, params);
@@ -54498,7 +54498,7 @@ function never(params) {
 var ZodVoid = /* @__PURE__ */ $constructor("ZodVoid", (inst, def) => {
   $ZodVoid.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => voidProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => voidProcessor(inst, ctx, json3, params);
 });
 function _void2(params) {
   return _void(ZodVoid, params);
@@ -54508,7 +54508,7 @@ var ZodDate = /* @__PURE__ */ $constructor(
   (inst, def) => {
     $ZodDate.init(inst, def);
     ZodType.init(inst, def);
-    inst._zod.processJSONSchema = (ctx, json2, params) => dateProcessor(inst, ctx, json2, params);
+    inst._zod.processJSONSchema = (ctx, json3, params) => dateProcessor(inst, ctx, json3, params);
     inst.min = (value, params) => inst.check(_gte(value, params));
     inst.max = (value, params) => inst.check(_lte(value, params));
   },
@@ -54530,7 +54530,7 @@ var ZodArray = /* @__PURE__ */ $constructor("ZodArray", (inst, def) => {
   _ensureDefaultMemoizer();
   $ZodArray.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => arrayProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => arrayProcessor(inst, ctx, json3, params);
   inst.element = def.element;
 }, {
   min(n, params) {
@@ -54560,7 +54560,7 @@ var ZodObject = /* @__PURE__ */ $constructor("ZodObject", (inst, def) => {
   _ensureDefaultMemoizer();
   $ZodObjectJIT.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => objectProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => objectProcessor(inst, ctx, json3, params);
   util_exports.installLazyProp(inst, "shape", (self) => self._zod.def.shape, false);
 }, {
   keyof() {
@@ -54633,7 +54633,7 @@ function looseObject(shape, params) {
 var ZodUnion = /* @__PURE__ */ $constructor("ZodUnion", (inst, def) => {
   $ZodUnion.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => unionProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => unionProcessor(inst, ctx, json3, params);
   inst.options = def.options;
 });
 function union(options, params) {
@@ -54646,7 +54646,7 @@ function union(options, params) {
 var ZodXor = /* @__PURE__ */ $constructor("ZodXor", (inst, def) => {
   ZodUnion.init(inst, def);
   $ZodXor.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => unionProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => unionProcessor(inst, ctx, json3, params);
   inst.options = def.options;
 });
 function xor(options, params) {
@@ -54672,7 +54672,7 @@ function discriminatedUnion(discriminator, options, params) {
 var ZodIntersection = /* @__PURE__ */ $constructor("ZodIntersection", (inst, def) => {
   $ZodIntersection.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => intersectionProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => intersectionProcessor(inst, ctx, json3, params);
 });
 function intersection(left, right) {
   return new ZodIntersection({
@@ -54685,7 +54685,7 @@ var ZodTuple = /* @__PURE__ */ $constructor("ZodTuple", (inst, def) => {
   _ensureDefaultMemoizer();
   $ZodTuple.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => tupleProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => tupleProcessor(inst, ctx, json3, params);
 }, {
   rest(rest) {
     return this.clone({
@@ -54718,7 +54718,7 @@ var ZodRecord = /* @__PURE__ */ $constructor("ZodRecord", (inst, def) => {
   _ensureDefaultMemoizer();
   $ZodRecord.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => recordProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => recordProcessor(inst, ctx, json3, params);
   inst.keyType = def.keyType;
   inst.valueType = def.valueType;
 });
@@ -54760,7 +54760,7 @@ var ZodMap = /* @__PURE__ */ $constructor("ZodMap", (inst, def) => {
   _ensureDefaultMemoizer();
   $ZodMap.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => mapProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => mapProcessor(inst, ctx, json3, params);
   inst.keyType = def.keyType;
   inst.valueType = def.valueType;
   inst.min = (...args) => inst.check(_minSize(...args));
@@ -54780,7 +54780,7 @@ var ZodSet = /* @__PURE__ */ $constructor("ZodSet", (inst, def) => {
   _ensureDefaultMemoizer();
   $ZodSet.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => setProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => setProcessor(inst, ctx, json3, params);
   inst.min = (...args) => inst.check(_minSize(...args));
   inst.nonempty = (params) => inst.check(_minSize(1, params));
   inst.max = (...args) => inst.check(_maxSize(...args));
@@ -54796,7 +54796,7 @@ function set(valueType, params) {
 var ZodEnum = /* @__PURE__ */ $constructor("ZodEnum", (inst, def) => {
   $ZodEnum.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => enumProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => enumProcessor(inst, ctx, json3, params);
   inst.enum = def.entries;
   inst.options = [...inst._zod.values];
   const keys = new Set(Object.keys(def.entries));
@@ -54849,7 +54849,7 @@ function nativeEnum(entries, params) {
 var ZodLiteral = /* @__PURE__ */ $constructor("ZodLiteral", (inst, def) => {
   $ZodLiteral.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => literalProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => literalProcessor(inst, ctx, json3, params);
   inst.values = new Set(def.values);
   Object.defineProperty(inst, "value", {
     get() {
@@ -54870,7 +54870,7 @@ function literal(value, params) {
 var ZodFile = /* @__PURE__ */ $constructor("ZodFile", (inst, def) => {
   $ZodFile.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => fileProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => fileProcessor(inst, ctx, json3, params);
   inst.min = (size2, params) => inst.check(_minSize(size2, params));
   inst.max = (size2, params) => inst.check(_maxSize(size2, params));
   inst.mime = (types22, params) => inst.check(_mime(Array.isArray(types22) ? types22 : [types22], params));
@@ -54882,7 +54882,7 @@ var ZodTransform = /* @__PURE__ */ $constructor("ZodTransform", (inst, def) => {
   _ensureDefaultMemoizer();
   $ZodTransform.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => transformProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => transformProcessor(inst, ctx, json3, params);
   inst._zod.parse = (payload, _ctx) => {
     if (_ctx.direction === "backward") {
       throw new $ZodEncodeError(inst.constructor.name);
@@ -54921,7 +54921,7 @@ function transform(fn) {
 var ZodOptional = /* @__PURE__ */ $constructor("ZodOptional", (inst, def) => {
   $ZodOptional.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => optionalProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => optionalProcessor(inst, ctx, json3, params);
   inst.unwrap = () => inst._zod.def.innerType;
 });
 function optional(innerType) {
@@ -54933,7 +54933,7 @@ function optional(innerType) {
 var ZodExactOptional = /* @__PURE__ */ $constructor("ZodExactOptional", (inst, def) => {
   $ZodExactOptional.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => optionalProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => optionalProcessor(inst, ctx, json3, params);
   inst.unwrap = () => inst._zod.def.innerType;
 });
 function exactOptional(innerType) {
@@ -54945,7 +54945,7 @@ function exactOptional(innerType) {
 var ZodNullable = /* @__PURE__ */ $constructor("ZodNullable", (inst, def) => {
   $ZodNullable.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => nullableProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => nullableProcessor(inst, ctx, json3, params);
   inst.unwrap = () => inst._zod.def.innerType;
 });
 function nullable(innerType) {
@@ -54960,7 +54960,7 @@ function nullish2(innerType) {
 var ZodDefault = /* @__PURE__ */ $constructor("ZodDefault", (inst, def) => {
   $ZodDefault.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => defaultProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => defaultProcessor(inst, ctx, json3, params);
   inst.unwrap = () => inst._zod.def.innerType;
   inst.removeDefault = inst.unwrap;
 });
@@ -54976,7 +54976,7 @@ function _default2(innerType, defaultValue) {
 var ZodPrefault = /* @__PURE__ */ $constructor("ZodPrefault", (inst, def) => {
   $ZodPrefault.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => prefaultProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => prefaultProcessor(inst, ctx, json3, params);
   inst.unwrap = () => inst._zod.def.innerType;
 });
 function prefault(innerType, defaultValue) {
@@ -54991,7 +54991,7 @@ function prefault(innerType, defaultValue) {
 var ZodNonOptional = /* @__PURE__ */ $constructor("ZodNonOptional", (inst, def) => {
   $ZodNonOptional.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => nonoptionalProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => nonoptionalProcessor(inst, ctx, json3, params);
   inst.unwrap = () => inst._zod.def.innerType;
 });
 function nonoptional(innerType, params) {
@@ -55004,7 +55004,7 @@ function nonoptional(innerType, params) {
 var ZodSuccess = /* @__PURE__ */ $constructor("ZodSuccess", (inst, def) => {
   $ZodSuccess.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => successProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => successProcessor(inst, ctx, json3, params);
   inst.unwrap = () => inst._zod.def.innerType;
 });
 function success(innerType) {
@@ -55016,7 +55016,7 @@ function success(innerType) {
 var ZodCatch = /* @__PURE__ */ $constructor("ZodCatch", (inst, def) => {
   $ZodCatch.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => catchProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => catchProcessor(inst, ctx, json3, params);
   inst.unwrap = () => inst._zod.def.innerType;
   inst.removeCatch = inst.unwrap;
 });
@@ -55030,7 +55030,7 @@ function _catch2(innerType, catchValue) {
 var ZodNaN = /* @__PURE__ */ $constructor("ZodNaN", (inst, def) => {
   $ZodNaN.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => nanProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => nanProcessor(inst, ctx, json3, params);
 });
 function nan(params) {
   return _nan(ZodNaN, params);
@@ -55038,7 +55038,7 @@ function nan(params) {
 var ZodPipe = /* @__PURE__ */ $constructor("ZodPipe", (inst, def) => {
   $ZodPipe.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => pipeProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => pipeProcessor(inst, ctx, json3, params);
   inst.in = def.in;
   inst.out = def.out;
 });
@@ -55080,7 +55080,7 @@ var ZodPreprocess = /* @__PURE__ */ $constructor("ZodPreprocess", (inst, def) =>
 var ZodReadonly = /* @__PURE__ */ $constructor("ZodReadonly", (inst, def) => {
   $ZodReadonly.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => readonlyProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => readonlyProcessor(inst, ctx, json3, params);
   inst.unwrap = () => inst._zod.def.innerType;
 });
 function readonly(innerType) {
@@ -55092,7 +55092,7 @@ function readonly(innerType) {
 var ZodTemplateLiteral = /* @__PURE__ */ $constructor("ZodTemplateLiteral", (inst, def) => {
   $ZodTemplateLiteral.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => templateLiteralProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => templateLiteralProcessor(inst, ctx, json3, params);
 });
 function templateLiteral(parts, params) {
   return new ZodTemplateLiteral({
@@ -55104,7 +55104,7 @@ function templateLiteral(parts, params) {
 var ZodLazy = /* @__PURE__ */ $constructor("ZodLazy", (inst, def) => {
   $ZodLazy.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => lazyProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => lazyProcessor(inst, ctx, json3, params);
   inst.unwrap = () => inst._zod.def.getter();
 });
 function lazy(getter) {
@@ -55116,7 +55116,7 @@ function lazy(getter) {
 var ZodPromise = /* @__PURE__ */ $constructor("ZodPromise", (inst, def) => {
   $ZodPromise.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => promiseProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => promiseProcessor(inst, ctx, json3, params);
   inst.unwrap = () => inst._zod.def.innerType;
 });
 function promise(innerType) {
@@ -55128,7 +55128,7 @@ function promise(innerType) {
 var ZodFunction = /* @__PURE__ */ $constructor("ZodFunction", (inst, def) => {
   $ZodFunction.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => functionProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => functionProcessor(inst, ctx, json3, params);
 });
 function _function(params) {
   return new ZodFunction({
@@ -55140,7 +55140,7 @@ function _function(params) {
 var ZodCustom = /* @__PURE__ */ $constructor("ZodCustom", (inst, def) => {
   $ZodCustom.init(inst, def);
   ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json2, params) => customProcessor(inst, ctx, json2, params);
+  inst._zod.processJSONSchema = (ctx, json3, params) => customProcessor(inst, ctx, json3, params);
 });
 function check(fn) {
   const ch = new $ZodCheck({
@@ -57508,12 +57508,12 @@ function earliestTimestamp(left, right) {
   return Math.min(left, right);
 }
 function hashWorkspacePath(value) {
-  let hash3 = 2166136261;
+  let hash4 = 2166136261;
   for (let index = 0; index < value.length; index += 1) {
-    hash3 ^= value.charCodeAt(index);
-    hash3 = Math.imul(hash3, 16777619);
+    hash4 ^= value.charCodeAt(index);
+    hash4 = Math.imul(hash4, 16777619);
   }
-  return (hash3 >>> 0).toString(36);
+  return (hash4 >>> 0).toString(36);
 }
 function normalizeTimestamp(value) {
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0)
@@ -61496,12 +61496,14 @@ var AdaptiveTransport = class extends BaseTransport {
       iceServers = [];
     }
     throwIfAborted(signal);
+    const negotiatedMs = negotiateTimeout(this.serverNegotiateTimeoutMs, this.options.negotiateTimeoutMs);
+    const effectiveNegotiateTimeoutMs = iceServers.length === 0 ? Math.min(negotiatedMs ?? DEFAULT_EMPTY_ICE_NEGOTIATE_TIMEOUT_MS, DEFAULT_EMPTY_ICE_NEGOTIATE_TIMEOUT_MS) : negotiatedMs;
     const rtc = new RtcDataChannelTransport({
       role: "initiator",
       factory,
       iceServers,
       onSignal: (signal2) => this.sendRtcSignal(signal2),
-      negotiateTimeoutMs: negotiateTimeout(this.serverNegotiateTimeoutMs, this.options.negotiateTimeoutMs),
+      negotiateTimeoutMs: effectiveNegotiateTimeoutMs,
       label: `client->${this.options.targetDeviceId}`,
       onDiagnostic: (event) => {
         this.lastRtcDiagnostics = event.diagnostics;
@@ -61520,7 +61522,11 @@ var AdaptiveTransport = class extends BaseTransport {
     });
     rtc.onClose(() => {
       if (this.rtc === rtc && this.dataMode === "webrtc") {
-        this.failConnection(new Error("Active WebRTC channel closed"), { reason: "webrtc-closed" });
+        const transport = this.selected;
+        this.failConnection(new Error("Active WebRTC channel closed"), {
+          reason: "webrtc-closed",
+          ...transport === "lan" || transport === "p2p" || transport === "turn" ? { transport } : {}
+        });
       }
     });
     try {
@@ -61848,12 +61854,15 @@ function socketState(readyState) {
   return "closed";
 }
 function negotiateTimeout(serverMs, localMs) {
-  if (serverMs === void 0)
+  if (localMs !== void 0)
     return localMs;
-  if (localMs === void 0)
-    return serverMs;
-  return Math.max(serverMs, localMs);
+  if (serverMs === void 0)
+    return void 0;
+  return Math.min(SERVER_NEGOTIATE_TIMEOUT_MAX_MS, Math.max(SERVER_NEGOTIATE_TIMEOUT_MIN_MS, serverMs));
 }
+var DEFAULT_EMPTY_ICE_NEGOTIATE_TIMEOUT_MS = 4e3;
+var SERVER_NEGOTIATE_TIMEOUT_MIN_MS = 6e3;
+var SERVER_NEGOTIATE_TIMEOUT_MAX_MS = 12e3;
 function throwIfAborted(signal) {
   if (signal?.aborted)
     throw new Error("Adaptive connection was aborted");
@@ -63771,7 +63780,7 @@ function eddsa(Point, cHash, eddsaOpts = {}) {
   });
   const { prehash } = eddsaOpts;
   const { BASE, Fp: Fp2, Fn: Fn2 } = Point;
-  const randomBytes13 = eddsaOpts.randomBytes || randomBytes2;
+  const randomBytes14 = eddsaOpts.randomBytes || randomBytes2;
   const adjustScalarBytes3 = eddsaOpts.adjustScalarBytes || ((bytes) => bytes);
   const domain2 = eddsaOpts.domain || ((data2, ctx, phflag) => {
     _abool2(phflag, "phflag");
@@ -63779,8 +63788,8 @@ function eddsa(Point, cHash, eddsaOpts = {}) {
       throw new Error("Contexts/pre-hash are not supported");
     return data2;
   });
-  function modN_LE(hash3) {
-    return Fn2.create(bytesToNumberLE(hash3));
+  function modN_LE(hash4) {
+    return Fn2.create(bytesToNumberLE(hash4));
   }
   function getPrivateScalar(key) {
     const len = lengths.secretKey;
@@ -63853,7 +63862,7 @@ function eddsa(Point, cHash, eddsaOpts = {}) {
     signature: 2 * _size2,
     seed: _size2
   };
-  function randomSecretKey(seed = randomBytes13(lengths.seed)) {
+  function randomSecretKey(seed = randomBytes14(lengths.seed)) {
     return _abytes2(seed, lengths.seed, "seed");
   }
   function keygen(seed) {
@@ -63949,9 +63958,9 @@ function _eddsa_new_output_to_legacy(c, eddsa3) {
   return legacy;
 }
 function twistedEdwards(c) {
-  const { CURVE, curveOpts, hash: hash3, eddsaOpts } = _eddsa_legacy_opts_to_new(c);
+  const { CURVE, curveOpts, hash: hash4, eddsaOpts } = _eddsa_legacy_opts_to_new(c);
   const Point = edwards(CURVE, curveOpts);
-  const EDDSA = eddsa(Point, hash3, eddsaOpts);
+  const EDDSA = eddsa(Point, hash4, eddsaOpts);
   return _eddsa_new_output_to_legacy(c, EDDSA);
 }
 
@@ -66177,18 +66186,18 @@ function validateTableBytes(numPoints, fpBytes) {
   if (bytes > TABLE_BYTES_MAX)
     throw new Error("invalid window size: table would need ~" + Math.ceil(bytes / 2 ** 20) + " MiB, max " + TABLE_BYTES_MAX / 2 ** 20 + " MiB");
 }
-function probeRandomBytes(randomBytes13, length) {
-  if (randomBytes13 === void 0)
+function probeRandomBytes(randomBytes14, length) {
+  if (randomBytes14 === void 0)
     return void 0;
-  afunction(randomBytes13, "randomBytes");
+  afunction(randomBytes14, "randomBytes");
   try {
-    const probe = randomBytes13(length);
+    const probe = randomBytes14(length);
     if (!isBytes3(probe) || probe.length !== length)
       return void 0;
   } catch {
     return void 0;
   }
-  return randomBytes13;
+  return randomBytes14;
 }
 function validateMSMPoints2(points, c) {
   aarray(points, "points");
@@ -66281,9 +66290,9 @@ var ScalarMultiplier = class {
   baseCanBeBlinded;
   bits;
   // Parametrized with a given Point class (not individual point)
-  constructor(Point, randomBytes13) {
+  constructor(Point, randomBytes14) {
     validatePointCons(Point);
-    this.randomBytes = probeRandomBytes(randomBytes13, BLIND_BYTES);
+    this.randomBytes = probeRandomBytes(randomBytes14, BLIND_BYTES);
     this.Point = Point;
     this.BASE = Point.BASE;
     this.ZERO = Point.ZERO;
@@ -66554,7 +66563,7 @@ function edwards2(params, extraOpts = {}) {
   if (FpLegendre2(Fp2, CURVE.d) !== -1)
     throw new Error("edwards: CURVE.d must be a non-square in Fp for complete addition formulas");
   validateObject2(opts, {}, { uvRatio: "function", randomBytes: "function" });
-  const randomBytes13 = opts.randomBytes === void 0 ? randomBytes4 : opts.randomBytes;
+  const randomBytes14 = opts.randomBytes === void 0 ? randomBytes4 : opts.randomBytes;
   const MASK = _2n6 << BigInt(Fp2.BYTES * 8) - _1n10;
   function isOdd(n) {
     if (!Fp2.isOdd)
@@ -66815,7 +66824,7 @@ function edwards2(params, extraOpts = {}) {
     }
   }
   const normalize = (points) => normalizeZ2(Point, points);
-  const wnaf = new ScalarMultiplier(Point, randomBytes13);
+  const wnaf = new ScalarMultiplier(Point, randomBytes14);
   if (wnaf.bits >= 6)
     Point.BASE.precompute(6);
   Object.freeze(Point.prototype);
@@ -67071,8 +67080,8 @@ function dhPubKeyLen() {
 }
 
 // node_modules/@lukeburns/clatterjs/dist/protocolNames.js
-function nqProtocolName(patternName, cipher, hash3) {
-  return `Noise_${patternName}_${X25519_NAME}_${cipher.name}_${hash3.name}`;
+function nqProtocolName(patternName, cipher, hash4) {
+  return `Noise_${patternName}_${X25519_NAME}_${cipher.name}_${hash4.name}`;
 }
 
 // node_modules/@lukeburns/clatterjs/dist/nqHandshake.js
@@ -68165,21 +68174,21 @@ var _HMAC = class {
   canXOF = false;
   finished = false;
   destroyed = false;
-  constructor(hash3, key) {
-    ahash(hash3);
+  constructor(hash4, key) {
+    ahash(hash4);
     abytes2(key, void 0, "key");
-    this.iHash = hash3.create();
+    this.iHash = hash4.create();
     if (typeof this.iHash.update !== "function")
       throw new Error("expected Hash instance");
     this.blockLen = this.iHash.blockLen;
     this.outputLen = this.iHash.outputLen;
     const blockLen = this.blockLen;
     const pad = new Uint8Array(blockLen);
-    pad.set(key.length > blockLen ? hash3.create().update(key).digest() : key);
+    pad.set(key.length > blockLen ? hash4.create().update(key).digest() : key);
     for (let i = 0; i < pad.length; i++)
       pad[i] ^= 54;
     this.iHash.update(pad);
-    this.oHash = hash3.create();
+    this.oHash = hash4.create();
     for (let i = 0; i < pad.length; i++)
       pad[i] ^= 54 ^ 92;
     this.oHash.update(pad);
@@ -68228,15 +68237,15 @@ var _HMAC = class {
   }
 };
 var hmac = /* @__PURE__ */ (() => {
-  const hmac_ = ((hash3, key, message) => new _HMAC(hash3, key).update(message).digest());
-  hmac_.create = (hash3, key) => new _HMAC(hash3, key);
+  const hmac_ = ((hash4, key, message) => new _HMAC(hash4, key).update(message).digest());
+  hmac_.create = (hash4, key) => new _HMAC(hash4, key);
   return hmac_;
 })();
 
 // node_modules/@lukeburns/clatterjs/dist/crypto/hash.js
-function makeHash(name2, hash3, hashLen, blockLen) {
-  const doHash = (data2) => hash3.create().update(data2).digest();
-  const hmac1 = (key, data2) => hmac(hash3, key, data2);
+function makeHash(name2, hash4, hashLen, blockLen) {
+  const doHash = (data2) => hash4.create().update(data2).digest();
+  const hmac1 = (key, data2) => hmac(hash4, key, data2);
   const hmacMany = (key, parts) => hmac1(key, parts.length === 1 ? parts[0] : concatBytes2(...parts));
   return {
     name: name2,
@@ -69818,8 +69827,8 @@ var LoopbackHost = class {
     }
   }
   openHttp(value) {
-    const body = value.body === void 0 ? void 0 : Buffer.from(value.body, "base64");
-    if ((body?.length ?? 0) > LOOPBACK_MAX_BODY_BYTES) throw new Error("body limit");
+    const body2 = value.body === void 0 ? void 0 : Buffer.from(value.body, "base64");
+    if ((body2?.length ?? 0) > LOOPBACK_MAX_BODY_BYTES) throw new Error("body limit");
     return new Promise((resolve7, reject) => {
       const headers = Object.fromEntries(cleanHeaders(value.headers));
       let handle;
@@ -69851,7 +69860,7 @@ var LoopbackHost = class {
       });
       handle = { kind: "http", port: value.port, request, reading: false, total: 0, touched: Date.now() };
       this.handles.set(value.id, handle);
-      request.end(body);
+      request.end(body2);
     });
   }
   openWs(value) {
@@ -70171,8 +70180,8 @@ var callSchema = external_exports.object({
   body: external_exports.object({
     endpoint: external_exports.enum(BOT_REMOTE_OPERATIONS),
     payload: external_exports.record(external_exports.string(), external_exports.unknown()).nullable().optional()
-  }).strict().superRefine((body, ctx) => {
-    if (body.endpoint === "approval-answer" && body.payload?.choice !== "allow" && body.payload?.choice !== "reject") {
+  }).strict().superRefine((body2, ctx) => {
+    if (body2.endpoint === "approval-answer" && body2.payload?.choice !== "allow" && body2.payload?.choice !== "reject") {
       ctx.addIssue({ code: external_exports.ZodIssueCode.custom, message: "Only one-time approval or rejection is supported." });
     }
   })
@@ -70625,12 +70634,12 @@ function basename(path) {
   return parts.at(-1) || path;
 }
 function hashString(value) {
-  let hash3 = 2166136261;
+  let hash4 = 2166136261;
   for (let index = 0; index < value.length; index += 1) {
-    hash3 ^= value.charCodeAt(index);
-    hash3 = Math.imul(hash3, 16777619);
+    hash4 ^= value.charCodeAt(index);
+    hash4 = Math.imul(hash4, 16777619);
   }
-  return (hash3 >>> 0).toString(36);
+  return (hash4 >>> 0).toString(36);
 }
 function errorCode(error62) {
   return "code" in error62 && typeof error62.code === "string" ? error62.code : void 0;
@@ -71130,12 +71139,12 @@ function isCanonicalBase642(value) {
   return value.length >= 4 && value.length % 4 === 0 && /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u.test(value);
 }
 function hashString2(value) {
-  let hash3 = 2166136261;
+  let hash4 = 2166136261;
   for (let index = 0; index < value.length; index += 1) {
-    hash3 ^= value.charCodeAt(index);
-    hash3 = Math.imul(hash3, 16777619);
+    hash4 ^= value.charCodeAt(index);
+    hash4 = Math.imul(hash4, 16777619);
   }
-  return (hash3 >>> 0).toString(16).padStart(8, "0");
+  return (hash4 >>> 0).toString(16).padStart(8, "0");
 }
 
 // src/codex/virtual-contract.ts
@@ -73262,16 +73271,16 @@ async function handleControlRequest(connection, handler, req, res, statusStream)
     writeText(res, 415, "content type must be application/json");
     return;
   }
-  let body;
+  let body2;
   try {
-    body = await readJsonBody(req);
+    body2 = await readJsonBody(req);
   } catch {
     writeText(res, 400, "body is not JSON");
     return;
   }
-  const message = clientRequest(body);
+  const message = clientRequest(body2);
   if (message === void 0) {
-    writeJson(res, 200, errorResponse(rpcId(body), {
+    writeJson(res, 200, errorResponse(rpcId(body2), {
       code: "gateway/bad-request",
       message: "invalid client-request message",
       details: { issues: [] }
@@ -73335,13 +73344,13 @@ function errorResponse(rpcId2, error62) {
 function fullResponse(rpcId2, result) {
   return { type: "server-response", rpcId: rpcId2, result };
 }
-function writeJson(res, status2, body) {
+function writeJson(res, status2, body2) {
   res.writeHead(status2, { "content-type": "application/json" });
-  res.end(JSON.stringify(body));
+  res.end(JSON.stringify(body2));
 }
-function writeText(res, status2, body) {
+function writeText(res, status2, body2) {
   res.writeHead(status2);
-  res.end(body);
+  res.end(body2);
 }
 
 // src/harness-version.ts
@@ -74416,10 +74425,10 @@ function boundedHistory(records, hasMore, throughSeq) {
   const selected = [];
   let budget = 48e3;
   for (const row of [...records].reverse()) {
-    const event = record7(row.event), json2 = JSON.stringify(row);
-    if (selected.length > 0 && json2.length > budget) break;
-    const text = json2.slice(0, Math.min(budget, 16e3));
-    selected.unshift({ seq: Number(event.seq), type: String(event.type), json: text, truncated: text.length < json2.length });
+    const event = record7(row.event), json3 = JSON.stringify(row);
+    if (selected.length > 0 && json3.length > budget) break;
+    const text = json3.slice(0, Math.min(budget, 16e3));
+    selected.unshift({ seq: Number(event.seq), type: String(event.type), json: text, truncated: text.length < json3.length });
     budget -= text.length;
     if (budget <= 0) break;
   }
@@ -74598,6 +74607,8 @@ var entryConfigSchema = s.object({
   enabled: s.boolean(),
   role: s.union(["host", "client", "both"]),
   serverUrl: s.string(),
+  fallbackServerUrl: s.string(),
+  failoverMinOutageMs: s.number(),
   deviceName: s.string(),
   terminal: s.object({ enabled: s.boolean() }),
   remoteTools: s.object({ enabled: s.boolean() }),
@@ -74605,6 +74616,7 @@ var entryConfigSchema = s.object({
   hostControl: s.object({ enabled: s.boolean() }),
   loopback: s.object({ ports: s.array(s.number()) }),
   forceRelay: s.boolean(),
+  iceIpv6: s.boolean(),
   rotatePinnedPeerKey: s.boolean(),
   logLevel: s.union(["debug", "info", "warn", "error"]),
   reconnect: s.union([
@@ -74623,7 +74635,18 @@ var entryConfigSchema = s.object({
     enabled: s.boolean(),
     binary: s.string()
   }),
-  acp: s.object({ enabled: s.boolean(), backends: s.array(s.object({ id: s.string(), enabled: s.boolean(), command: s.string(), args: s.array(s.string()), cwd: s.string() })) })
+  acp: s.object({ enabled: s.boolean(), backends: s.array(s.object({ id: s.string(), enabled: s.boolean(), command: s.string(), args: s.array(s.string()), cwd: s.string() })) }),
+  selfHost: s.object({
+    enabled: s.boolean(),
+    port: s.natural().min(1).max(65535),
+    account: s.string(),
+    password: s.string(),
+    publicUrl: s.string(),
+    tunnel: s.object({
+      mode: s.union(["off", "named"]),
+      token: s.string()
+    })
+  })
 });
 function withVolatileSchema(schema) {
   const volatile = schema.volatile;
@@ -74642,6 +74665,8 @@ var configSchema = external_exports.object({
   enabled: external_exports.boolean().optional(),
   role: external_exports.enum(["host", "client", "both"]).optional(),
   serverUrl: external_exports.string().url().optional(),
+  fallbackServerUrl: external_exports.string().url().optional(),
+  failoverMinOutageMs: external_exports.number().int().min(1e4).max(36e5).optional(),
   deviceName: external_exports.string().trim().min(1).max(80).optional(),
   terminal: external_exports.object({ enabled: external_exports.boolean().optional() }).strict().optional(),
   remoteTools: external_exports.object({ enabled: external_exports.boolean().optional() }).strict().optional(),
@@ -74649,6 +74674,7 @@ var configSchema = external_exports.object({
   hostControl: external_exports.object({ enabled: external_exports.boolean().optional() }).strict().optional(),
   loopback: external_exports.object({ ports: external_exports.array(external_exports.number().int().min(1024).max(65535)).max(16).optional() }).strict().optional(),
   forceRelay: external_exports.boolean().optional(),
+  iceIpv6: external_exports.boolean().optional(),
   rotatePinnedPeerKey: external_exports.boolean().optional(),
   logLevel: external_exports.enum(["debug", "info", "warn", "error"]).optional(),
   reconnect: reconnectSchema.optional(),
@@ -74660,7 +74686,18 @@ var configSchema = external_exports.object({
     enabled: external_exports.boolean().optional(),
     binary: external_exports.string().trim().min(1).max(4096).optional()
   }).strict().optional(),
-  acp: external_exports.object({ enabled: external_exports.boolean().optional(), backends: external_exports.array(external_exports.object({ id: external_exports.string().trim().regex(/^[a-z0-9][a-z0-9._-]{0,31}$/i), enabled: external_exports.boolean().optional(), command: external_exports.string().trim().min(1).max(4096).optional(), args: external_exports.array(external_exports.string().max(4096)).max(32).optional(), cwd: external_exports.string().max(4096).optional() }).strict()).max(12).optional(), backend: external_exports.string().trim().regex(/^[a-z0-9][a-z0-9._-]{0,31}$/i).optional(), command: external_exports.string().trim().min(1).max(4096).optional(), args: external_exports.array(external_exports.string().max(4096)).max(32).optional(), cwd: external_exports.string().max(4096).optional() }).strict().optional()
+  acp: external_exports.object({ enabled: external_exports.boolean().optional(), backends: external_exports.array(external_exports.object({ id: external_exports.string().trim().regex(/^[a-z0-9][a-z0-9._-]{0,31}$/i), enabled: external_exports.boolean().optional(), command: external_exports.string().trim().min(1).max(4096).optional(), args: external_exports.array(external_exports.string().max(4096)).max(32).optional(), cwd: external_exports.string().max(4096).optional() }).strict()).max(12).optional(), backend: external_exports.string().trim().regex(/^[a-z0-9][a-z0-9._-]{0,31}$/i).optional(), command: external_exports.string().trim().min(1).max(4096).optional(), args: external_exports.array(external_exports.string().max(4096)).max(32).optional(), cwd: external_exports.string().max(4096).optional() }).strict().optional(),
+  selfHost: external_exports.object({
+    enabled: external_exports.boolean().optional(),
+    port: external_exports.number().int().min(1).max(65535).optional(),
+    account: external_exports.string().trim().max(254).optional(),
+    password: external_exports.string().max(1024).optional(),
+    publicUrl: external_exports.string().url().optional(),
+    tunnel: external_exports.object({
+      mode: external_exports.enum(["off", "named"]).optional(),
+      token: external_exports.string().max(4096).optional()
+    }).strict().optional()
+  }).strict().optional()
 }).strict();
 function resolveConfig(input4 = {}, env = process.env) {
   const parsed = configSchema.parse(input4);
@@ -74671,8 +74708,18 @@ function resolveConfig(input4 = {}, env = process.env) {
   const codexEnabled = codexBackend?.enabled ?? parsed.codex?.enabled ?? true;
   const acpEnabled = parsed.acp?.enabled ?? true;
   const reconnect = typeof parsed.reconnect === "object" ? parsed.reconnect : {};
+  const selfHostOptions = parsed.selfHost ?? {};
+  const selfHostEnabled = selfHostOptions.enabled ?? false;
+  const tunnelOptions = selfHostOptions.tunnel ?? {};
   const configuredServerUrl = parsed.serverUrl ?? env.DSH_REMOTE_SERVER;
+  const configuredFallbackServerUrl = parsed.fallbackServerUrl ?? env.DSH_REMOTE_FALLBACK_SERVER;
   const serverUrl = configuredServerUrl === void 0 ? void 0 : normalizeServerUrl(configuredServerUrl);
+  const fallbackServerUrl = configuredFallbackServerUrl === void 0 ? void 0 : normalizeServerUrl(configuredFallbackServerUrl);
+  const configuredFailoverMinOutageMs = parsed.failoverMinOutageMs ?? (env.DSH_REMOTE_FAILOVER_MIN_OUTAGE_MS === void 0 ? void 0 : Number(env.DSH_REMOTE_FAILOVER_MIN_OUTAGE_MS));
+  const failoverMinOutageMs = configuredFailoverMinOutageMs ?? 12e4;
+  if (!Number.isFinite(failoverMinOutageMs) || failoverMinOutageMs < 1e4) {
+    throw new TypeError("failoverMinOutageMs must be a number of at least 10000 milliseconds");
+  }
   const initialDelayMs = reconnect.initialDelayMs ?? 4e3;
   const maxDelayMs = reconnect.maxDelayMs ?? 3e4;
   if (maxDelayMs < initialDelayMs) {
@@ -74682,6 +74729,8 @@ function resolveConfig(input4 = {}, env = process.env) {
     enabled: parsed.enabled ?? true,
     role: parsed.role ?? "host",
     ...serverUrl === void 0 ? {} : { serverUrl },
+    ...fallbackServerUrl === void 0 ? {} : { fallbackServerUrl },
+    failoverMinOutageMs,
     deviceName: parsed.deviceName ?? env.DSH_REMOTE_DEVICE_NAME ?? hostname3(),
     hostControl: { enabled: parsed.hostControl?.enabled ?? true },
     terminal: { enabled: parsed.terminal?.enabled ?? (env.DSH_REMOTE_TERMINAL_ENABLED === void 0 || env.DSH_REMOTE_TERMINAL_ENABLED === "true") },
@@ -74689,6 +74738,9 @@ function resolveConfig(input4 = {}, env = process.env) {
     sidebar: { entry: parsed.sidebar?.entry === "compact" ? "compact" : "standard" },
     loopback: { ports: [...new Set(parsed.loopback?.ports ?? [])] },
     forceRelay: parsed.forceRelay ?? false,
+    // Fork default: dual-stack peers (mobile 5G + home broadband IPv6) can
+    // reach the Host directly without NAT hole punching. Opt out with false.
+    iceIpv6: parsed.iceIpv6 ?? true,
     rotatePinnedPeerKey: parsed.rotatePinnedPeerKey ?? false,
     logLevel: parsed.logLevel ?? "info",
     reconnect: {
@@ -74721,6 +74773,17 @@ function resolveConfig(input4 = {}, env = process.env) {
           ...cwd2 === void 0 ? {} : { cwd: cwd2 }
         };
       })
+    },
+    selfHost: {
+      enabled: selfHostEnabled,
+      port: selfHostOptions.port ?? 8081,
+      account: selfHostOptions.account ?? "",
+      password: selfHostOptions.password ?? "",
+      ...selfHostOptions.publicUrl === void 0 ? {} : { publicUrl: selfHostOptions.publicUrl },
+      tunnel: {
+        mode: tunnelOptions.mode === "named" ? "named" : "off",
+        token: tunnelOptions.token ?? ""
+      }
     }
   };
 }
@@ -74753,10 +74816,11 @@ function normalizeServerUrl(value) {
 }
 
 // src/version.ts
-var PLUGIN_VERSION = "0.6.2";
+var PLUGIN_VERSION = "0.6.4-fork.4";
 
 // src/server-api.ts
 var TERMINAL_CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/u;
+var HEALTH_PROBE_TIMEOUT_MS = 8e3;
 var HostServerApi = class {
   constructor(serverUrl, store, fetchImplementation = fetch, role = "host") {
     this.store = store;
@@ -74791,6 +74855,30 @@ var HostServerApi = class {
   async hasStoredAuthorization() {
     const identity3 = this.requireIdentity();
     return await this.store.load(this.baseUrl, identity3.deviceId) !== void 0;
+  }
+  /**
+   * Reachability probe for a server origin, used when deciding whether a Host that
+   * failed over may return to its primary server. Credentials are deliberately not
+   * involved: both the official server and the embedded one answer `/health`, and a
+   * 2xx proves the origin is serving again. Anything else (a network error, a
+   * Cloudflare `530` while a tunnel is down, any non-2xx) counts as not recovered.
+   */
+  async checkHealth() {
+    const controller = new AbortController();
+    const timer2 = setTimeout(() => controller.abort(), HEALTH_PROBE_TIMEOUT_MS);
+    const signal = AbortSignal.any([this.lifetime.signal, controller.signal]);
+    try {
+      const response = await this.fetchImplementation(`${this.baseUrl}/health`, {
+        method: "GET",
+        signal,
+        headers: { Accept: "application/json" }
+      });
+      return response.ok;
+    } catch {
+      return false;
+    } finally {
+      clearTimeout(timer2);
+    }
   }
   async clearAuthorization() {
     this.credentials = void 0;
@@ -74840,9 +74928,9 @@ var HostServerApi = class {
     };
   }
   async oauthProviders() {
-    let body;
+    let body2;
     try {
-      body = await this.publicRequest("/api/v1/auth/oauth/providers", { method: "GET" });
+      body2 = await this.publicRequest("/api/v1/auth/oauth/providers", { method: "GET" });
     } catch (error62) {
       if (!(error62 instanceof ServerApiError) || error62.status !== 404) throw error62;
       const legacy = [
@@ -74861,7 +74949,7 @@ var HostServerApi = class {
       }));
       return items.flat();
     }
-    const value = requireRecord(body, "OAuth providers");
+    const value = requireRecord(body2, "OAuth providers");
     if (!Array.isArray(value.items)) throw invalidOAuthProviders();
     const ids = /* @__PURE__ */ new Set();
     return value.items.map((item) => {
@@ -75111,10 +75199,10 @@ var HostServerApi = class {
           ...init.headers
         }
       });
-      const body = await parseBody(response);
+      const body2 = await parseBody(response);
       signal.throwIfAborted();
       if (!response.ok) {
-        const envelope = isErrorEnvelope(body) ? body : void 0;
+        const envelope = isErrorEnvelope(body2) ? body2 : void 0;
         if ((response.status === 401 || response.status === 403) && envelope === void 0) {
           throw new ServerApiError(
             "CONNECTION_FAILED",
@@ -75134,7 +75222,7 @@ var HostServerApi = class {
           "http_error"
         );
       }
-      return body;
+      return body2;
     } catch (error62) {
       if (this.lifetime.signal.aborted) throw this.lifetime.signal.reason;
       if (error62 instanceof ServerApiError) throw error62;
@@ -76393,7 +76481,10 @@ function buildWeriftFactory(werift, options = {}) {
       const raw = new werift.RTCPeerConnection({
         iceServers: orderIceServersForWerift(configuration.iceServers ?? []),
         iceUseIpv4: true,
-        iceUseIpv6: false,
+        // IPv6 host candidates let a dual-stack client (mobile carriers usually
+        // are) reach this Host without NAT hole punching at all. Disabled by
+        // default historically; callers opt in through the plugin config.
+        iceUseIpv6: options.iceIpv6 === true,
         iceUseLinkLocalAddress: false,
         ...hostIpv4Candidates.length === 0 ? {} : {
           iceAdditionalHostAddresses: hostIpv4Candidates,
@@ -76620,15 +76711,15 @@ function toArrayBuffer2(data2) {
   return data2.buffer.slice(data2.byteOffset, data2.byteOffset + data2.byteLength);
 }
 function normalizeNativeCandidate(candidate) {
-  const json2 = typeof candidate.toJSON === "function" ? candidate.toJSON() : {
+  const json3 = typeof candidate.toJSON === "function" ? candidate.toJSON() : {
     candidate: candidate.candidate,
     sdpMid: candidate.sdpMid,
     sdpMLineIndex: candidate.sdpMLineIndex,
     usernameFragment: candidate.usernameFragment
   };
   return {
-    ...json2,
-    sdpMLineIndex: normalizeSdpMLineIndex(json2.sdpMLineIndex)
+    ...json3,
+    sdpMLineIndex: normalizeSdpMLineIndex(json3.sdpMLineIndex)
   };
 }
 function normalizeNativeMessageData(data2) {
@@ -76762,7 +76853,7 @@ async function detectRouteHostIpv4(target3, timeoutMs) {
   }
 }
 function isCacheableFactoryOptions(options) {
-  return options.interfaces === void 0 && options.preferredHostIpv4Candidates === void 0 && options.routeTargets === void 0;
+  return options.interfaces === void 0 && options.preferredHostIpv4Candidates === void 0 && options.routeTargets === void 0 && options.iceIpv6 === void 0;
 }
 function parseIceCandidate(candidate) {
   const value = candidate.candidate?.trim();
@@ -77486,7 +77577,7 @@ var ClientModeRuntime = class {
     }
     return remote.client.rpc("fileviewer.call", { endpoint, payload }, signal);
   }
-  async pluginRoute(route, body, signal) {
+  async pluginRoute(route, body2, signal) {
     const remote = this.connected;
     if (remote === void 0 || this.status().mode !== "remote") {
       throw new ClientModeError("REMOTE_NOT_CONNECTED", "No Remote Host is selected.", true);
@@ -77494,7 +77585,7 @@ var ClientModeRuntime = class {
     if (!remote.features.pluginRoute) {
       throw new ClientModeError("FEATURE_NOT_SUPPORTED", "The connected Host cannot forward plugin routes.");
     }
-    return remote.client.rpc("plugin.route.call", { route, body }, signal);
+    return remote.client.rpc("plugin.route.call", { route, body: body2 }, signal);
   }
   activeRemote() {
     return this.connected;
@@ -77984,7 +78075,7 @@ var ControlStatusStream = class {
 
 // src/codex/domain.ts
 import { randomUUID as randomUUID13 } from "node:crypto";
-import { accessSync, constants as constants2, existsSync as existsSync2, readFileSync } from "node:fs";
+import { accessSync, constants as constants2, existsSync as existsSync2, readdirSync as readdirSync2, readFileSync, statSync as statSync2 } from "node:fs";
 import { readdir, realpath, stat as stat3 } from "node:fs/promises";
 import { homedir as homedir3 } from "node:os";
 import { basename as basename3, isAbsolute as isAbsolute3, join as join6, relative, resolve } from "node:path";
@@ -79764,7 +79855,14 @@ function findImageBlock(value, attachmentId) {
   return void 0;
 }
 function codexBinaryCandidates(configured, hostPlatform = process.platform, userHome = homedir3()) {
-  if (configured !== "codex" || hostPlatform !== "darwin") return [configured];
+  if (configured !== "codex") return [configured];
+  if (hostPlatform === "darwin") return macOSCodexBinaryCandidates(userHome);
+  if (hostPlatform === "win32") {
+    return [.../* @__PURE__ */ new Set([...windowsBundledCodexCandidates(userHome), configured])];
+  }
+  return [configured];
+}
+function macOSCodexBinaryCandidates(userHome) {
   const bundledCandidates = [
     "/Applications/ChatGPT.app",
     join6(userHome, "Applications", "ChatGPT.app")
@@ -79787,8 +79885,23 @@ function codexBinaryCandidates(configured, hostPlatform = process.platform, user
     ...bundledCandidates,
     "/Applications/ChatGPT.app/Contents/Resources/codex",
     join6(userHome, "Applications", "ChatGPT.app", "Contents", "Resources", "codex"),
-    configured
+    "codex"
   ])];
+}
+function windowsBundledCodexCandidates(userHome) {
+  const localAppData = process.env.LOCALAPPDATA ?? join6(userHome, "AppData", "Local");
+  const binRoot = join6(localAppData, "OpenAI", "Codex", "bin");
+  try {
+    return readdirSync2(binRoot, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => join6(binRoot, entry.name, "codex.exe")).filter((candidate) => existsSync2(candidate)).map((candidate) => {
+      try {
+        return { candidate, mtime: statSync2(candidate).mtimeMs };
+      } catch {
+        return { candidate, mtime: 0 };
+      }
+    }).sort((left, right) => right.mtime - left.mtime).map((entry) => entry.candidate);
+  } catch {
+    return [];
+  }
 }
 function parseCallEnvelope(input4) {
   if (!isRecord13(input4) || typeof input4.method !== "string" || !("params" in input4) || Object.keys(input4).some((key) => key !== "method" && key !== "params")) {
@@ -81239,9 +81352,9 @@ var RemoteTerminalState = class {
   }
 };
 var RemoteTerminalController = class {
-  constructor(shared, spawn7, enabled, scopeError) {
+  constructor(shared, spawn8, enabled, scopeError) {
     this.shared = shared;
-    this.spawn = spawn7;
+    this.spawn = spawn8;
     this.enabled = enabled;
     this.scopeError = scopeError;
   }
@@ -86863,8 +86976,10 @@ function isOversizedListing(value) {
 
 // src/server-connection.ts
 var DEFAULT_WEBRTC_NEGOTIATE_TIMEOUT_MS = 12e3;
+var FAILOVER_MIN_FAILURES = 5;
+var DEFAULT_FAILOVER_MIN_OUTAGE_MS = 2 * 6e4;
 var HostServerConnection = class {
-  constructor(config2, identity3, identities, api, connections, logger2, createWebSocket = (url2) => new WebSocket(url2), rtcFactoryProvider, hostCapabilities = () => [], harnessVersion) {
+  constructor(config2, identity3, identities, api, connections, logger2, createWebSocket = (url2) => new WebSocket(url2), rtcFactoryProvider, hostCapabilities = () => [], harnessVersion, onFailover) {
     this.config = config2;
     this.identity = identity3;
     this.identities = identities;
@@ -86875,6 +86990,7 @@ var HostServerConnection = class {
     this.rtcFactoryProvider = rtcFactoryProvider;
     this.hostCapabilities = hostCapabilities;
     this.harnessVersion = harnessVersion;
+    this.onFailover = onFailover;
   }
   socket;
   running;
@@ -86891,6 +87007,12 @@ var HostServerConnection = class {
   negotiatedCapabilities = ["transport.relay"];
   controlFrameLimits = {};
   webRtcNegotiateTimeoutMs = DEFAULT_WEBRTC_NEGOTIATE_TIMEOUT_MS;
+  /** Consecutive retryable connection failures; used to trigger a server failover. */
+  consecutiveFailures = 0;
+  /** When the current failure streak started; a failover needs a sustained outage. */
+  failingSince;
+  /** The failover callback has already been requested for this connection. */
+  failoverRequested = false;
   start() {
     if (this.running !== void 0) return;
     this.stopped = false;
@@ -86987,6 +87109,18 @@ var HostServerConnection = class {
           return;
         }
         if (!this.config.reconnect.enabled) return;
+        this.consecutiveFailures += 1;
+        this.failingSince ??= Date.now();
+        const minOutageMs = this.config.failoverMinOutageMs ?? DEFAULT_FAILOVER_MIN_OUTAGE_MS;
+        if (this.consecutiveFailures >= FAILOVER_MIN_FAILURES && Date.now() - this.failingSince >= minOutageMs && !this.failoverRequested && this.onFailover !== void 0) {
+          this.failoverRequested = true;
+          this.logger.warn("primary server kept failing; switching to the fallback server");
+          try {
+            this.onFailover();
+          } catch (failoverError) {
+            this.logger.error("fallback server switch failed", { code: errorCode4(failoverError) });
+          }
+        }
       }
       if (this.stopped) return;
       if (this.reconnectRequested) {
@@ -87064,11 +87198,18 @@ var HostServerConnection = class {
             }
             acknowledged = true;
             clearTimeout(helloTimer);
+            if (this.rtcFactory === void 0 && this.rtcFactoryProvider !== void 0 && !this.config.forceRelay) {
+              void this.rtcFactoryProvider().then((factory) => {
+                if (factory !== void 0) this.rtcFactory ??= factory;
+              }).catch(() => void 0);
+            }
             for (const tunnel of [...this.tunnels.values()]) {
               const required2 = tunnel.transport === "relay" ? RELAY_RESUME_CAPABILITY : WEBRTC_RESUME_CAPABILITY;
               if (tunnel.lease && !this.negotiatedCapabilities.includes(required2)) await this.dropTunnel(tunnel.connectionId);
             }
             this.online = true;
+            this.consecutiveFailures = 0;
+            this.failingSince = void 0;
             this.terminalError = void 0;
             this.logger.info("server control connection online", {
               serverVersion: payload.serverVersion,
@@ -87169,7 +87310,13 @@ var HostServerConnection = class {
       return;
     }
     if (frame.type === "signal.offer") {
-      await this.handleSignalOffer(requireSignal(frame.payload));
+      if (!this.canUseWebRtc()) {
+        throw new ControlConnectionError("INVALID_MESSAGE", "Server forwarded WebRTC signaling without negotiating it.");
+      }
+      void this.handleSignalOffer(requireSignal(frame.payload)).catch((error62) => {
+        if (this.stopped) return;
+        this.logger.warn("webrtc offer handling failed", { reason: diagnosticReason3(asError2(error62)) });
+      });
       return;
     }
     if (frame.type === "signal.ice") {
@@ -87372,9 +87519,6 @@ var HostServerConnection = class {
     }
   }
   async handleSignalOffer(payload) {
-    if (!this.canUseWebRtc()) {
-      throw new ControlConnectionError("INVALID_MESSAGE", "Server forwarded WebRTC signaling without negotiating it.");
-    }
     const tunnel = this.tunnels.get(payload.connectionId);
     if (tunnel === void 0 || payload.targetDeviceId !== this.identity.deviceId) {
       this.logger.warn("stale webrtc offer ignored", { connectionId: shortId3(payload.connectionId) });
@@ -87404,7 +87548,7 @@ var HostServerConnection = class {
         code: errorCode4(error62)
       });
     }
-    if (this.stopped || this.tunnels.get(tunnel.connectionId) !== tunnel || tunnel.rtc !== void 0 || tunnel.channel !== void 0) return;
+    if (this.stopped || this.tunnels.get(tunnel.connectionId) !== tunnel || tunnel.rtc !== void 0 || tunnel.channel !== void 0 || tunnel.transport !== "negotiating") return;
     if (!tunnel.preferredTransports.includes("turn")) iceServers = stunOnlyIceServers(iceServers);
     const rtc = new RtcDataChannelTransport({
       role: "responder",
@@ -87435,6 +87579,11 @@ var HostServerConnection = class {
       void this.handleRtcFailed(tunnel, rtc, asError2(error62));
     });
     rtc.handleSignal({ type: "offer", sdp: payload.sdp });
+    const buffered = tunnel.pendingIce;
+    if (buffered !== void 0) {
+      tunnel.pendingIce = void 0;
+      for (const candidate of buffered) rtc.handleSignal({ type: "ice", candidate });
+    }
   }
   handleSignalIce(payload) {
     if (!this.canUseWebRtc()) {
@@ -87442,7 +87591,12 @@ var HostServerConnection = class {
     }
     const tunnel = this.tunnels.get(payload.connectionId);
     if (tunnel === void 0 || payload.targetDeviceId !== this.identity.deviceId) return;
-    tunnel.rtc?.handleSignal({ type: "ice", candidate: payload.candidate });
+    const rtc = tunnel.rtc;
+    if (rtc !== void 0) {
+      rtc.handleSignal({ type: "ice", candidate: payload.candidate });
+      return;
+    }
+    if (tunnel.channel === void 0) (tunnel.pendingIce ??= []).push(payload.candidate);
   }
   async handleTransportSelected(payload) {
     const tunnel = this.tunnels.get(payload.connectionId);
@@ -88207,7 +88361,7 @@ var HarnessRemoteBridge = class {
     if (TERMINAL_STREAMS.has(params.endpoint)) throw new RpcError("METHOD_NOT_ALLOWED", "Use a stream for this terminal endpoint.");
     if (["settings/update", "settings/replace", "settings/mutate"].includes(params.endpoint)) {
       const args = requestArgs(params.payload);
-      if (args.ns === "ds-harness-remote" || args.ns === "dsh-remote") {
+      if (args.ns === "dsh-agent-remote" || args.ns === "dsh-remote") {
         throw new RpcError("PERMISSION_DENIED", "Remote access settings can only be changed locally on the Host.");
       }
     }
@@ -88436,8 +88590,8 @@ var HarnessRemoteBridge = class {
     if (!result.ok || !Array.isArray(result.value)) throw new RpcError("PERMISSION_DENIED", "Cannot verify the Host plugin inventory.");
     const row = result.value.find((value) => isRecord21(value) && value[plugin ? "entryId" : "name"] === args[key]);
     if (!isRecord21(row) || row.readOnlyReason !== void 0) throw new RpcError("PERMISSION_DENIED", "The Host plugin cannot be changed remotely.");
-    const remoteModule = (value) => typeof value === "string" && /^(?:ds-harness-remote|dsh-remote)(?:\/|$)/.test(value);
-    if (remoteModule(plugin ? row.moduleName : row.name) || !plugin && (!Array.isArray(row.rows) || row.rows.some((value) => !isRecord21(value) || remoteModule(value.moduleName)) || Array.isArray(row.overrides) && row.overrides.some((value) => remoteModule(value) || value === "ds-harness-remote-tui"))) {
+    const remoteModule = (value) => typeof value === "string" && /^(?:dsh-agent-remote|dsh-remote)(?:\/|$)/.test(value);
+    if (remoteModule(plugin ? row.moduleName : row.name) || !plugin && (!Array.isArray(row.rows) || row.rows.some((value) => !isRecord21(value) || remoteModule(value.moduleName)) || Array.isArray(row.overrides) && row.overrides.some((value) => remoteModule(value) || value === "dsh-agent-remote-tui"))) {
       throw new RpcError("PERMISSION_DENIED", "The Remote plugin can only be enabled or disabled locally on the Host.");
     }
   }
@@ -88894,7 +89048,7 @@ function filterSessionListProjections(resultOrEndpoint, maybeResult) {
 }
 function filterRemotePluginInventory(endpoint, result) {
   if (!result.ok) return result;
-  const isRemote = (value) => typeof value === "string" && /^(?:ds-harness-remote|dsh-remote)(?:\/|$)/.test(value);
+  const isRemote = (value) => typeof value === "string" && /^(?:dsh-agent-remote|dsh-remote)(?:\/|$)/.test(value);
   const filterEntries = (entries) => entries.filter((entry) => !isRecord21(entry) || !isRemote(entry.moduleName));
   if (endpoint === "pluginManager/listPlugins" && Array.isArray(result.value)) {
     return { ...result, value: filterEntries(result.value) };
@@ -88944,6 +89098,8 @@ var CodexWorkspaceBridge = class extends WorkspaceBridge {
 };
 
 // src/service.ts
+var PRIMARY_RECOVERY_PROBE_MS = 6e4;
+var PRIMARY_RECOVERY_CONFIRMATIONS = 2;
 var HostPluginRuntime = class {
   constructor(config2, identities, logger2, localGateway, fileViewerHost, terminalSpawner, pluginRoutes) {
     this.config = config2;
@@ -89026,6 +89182,11 @@ var HostPluginRuntime = class {
   serverConnection;
   harnessVersion;
   closed = false;
+  failoverInFlight = false;
+  /** Origin the Host left behind when it failed over; probed so a recovered primary is picked up. */
+  primaryServerUrl;
+  primaryProbe;
+  primaryProbeHits = 0;
   codex;
   acp;
   codexWorkspaceState = new WorkspaceBridgeState((key) => TerminalPolicy.releaseOwner(this.terminalOwners, key));
@@ -89262,6 +89423,7 @@ var HostPluginRuntime = class {
   async close() {
     if (this.closed) return;
     this.closed = true;
+    this.stopPrimaryRecoveryProbe();
     this.serverApi?.close();
     await this.serverConnection?.stop();
     await this.connections.close();
@@ -89301,10 +89463,116 @@ var HostPluginRuntime = class {
       this.connections,
       this.logger,
       void 0,
-      this.config.forceRelay ? void 0 : () => loadNodeRtcFactory({ routeTargets: this.config.serverUrl === void 0 ? [] : [this.config.serverUrl] }),
+      this.config.forceRelay ? void 0 : () => loadNodeRtcFactory({
+        routeTargets: this.config.serverUrl === void 0 ? [] : [this.config.serverUrl],
+        iceIpv6: this.config.iceIpv6
+      }),
       () => this.hostCapabilities(),
-      this.harnessVersion
+      this.harnessVersion,
+      () => this.switchToFallbackServer()
     );
+  }
+  /**
+   * Move the Host to `targetUrl`: rebuild the origin-scoped server API and restart the
+   * control connection. Used both when the primary server keeps failing and when a
+   * recovered primary server is picked up again.
+   */
+  switchServer(targetUrl, options = {}) {
+    if (this.closed || this.failoverInFlight) return;
+    this.failoverInFlight = true;
+    void (async () => {
+      try {
+        const previous = this.serverConnection;
+        this.serverConnection = void 0;
+        await previous?.stop().catch(() => void 0);
+        const identity3 = this.identity;
+        if (identity3 === void 0 || this.closed) return;
+        this.serverApi?.close();
+        this.serverApi = new HostServerApi(targetUrl, new ServerCredentialStore(this.identities.directory));
+        this.serverApi.bindIdentity(identity3);
+        this.serverApi.setHarnessVersion(this.harnessVersion);
+        if (options.authorizeFallbackAccount === true) {
+          const account = this.config.selfHost.account;
+          const password = this.config.selfHost.password;
+          if (account !== "" && password !== "") {
+            try {
+              if (!await this.serverApi.hasStoredAuthorization()) {
+                await this.serverApi.authorizeWithAccount(identity3, account, password);
+                this.logger.info("authorized Host on the fallback server");
+              }
+            } catch (authorizeError) {
+              this.logger.warn("fallback server authorization failed; log in manually in Remote settings", {
+                message: authorizeError instanceof Error ? authorizeError.message : String(authorizeError)
+              });
+            }
+          }
+        }
+        this.config.serverUrl = targetUrl;
+        this.serverConnection = this.createServerConnection(identity3);
+        this.serverConnection.start();
+      } catch (error62) {
+        this.logger.error("server switch failed", {
+          message: error62 instanceof Error ? error62.message : String(error62)
+        });
+      } finally {
+        this.failoverInFlight = false;
+      }
+    })();
+  }
+  /**
+   * Fail over to `fallbackServerUrl` after the primary server stayed unreachable, then
+   * keep probing the primary so the Host returns to it automatically once it recovers.
+   * Clients authorize per origin, so a failover is never transparent to them.
+   */
+  switchToFallbackServer() {
+    const fallbackUrl = this.config.fallbackServerUrl;
+    const primaryUrl = this.config.serverUrl;
+    if (fallbackUrl === void 0 || primaryUrl === fallbackUrl) return;
+    if (this.closed) return;
+    this.logger.warn("switching Host connection to the fallback server", {
+      from: primaryUrl ?? "(unset)",
+      to: fallbackUrl
+    });
+    this.primaryServerUrl = primaryUrl;
+    this.switchServer(fallbackUrl, { authorizeFallbackAccount: true });
+    this.startPrimaryRecoveryProbe();
+  }
+  startPrimaryRecoveryProbe() {
+    this.stopPrimaryRecoveryProbe();
+    if (this.closed) return;
+    const timer2 = setInterval(() => {
+      void this.probePrimaryServer();
+    }, PRIMARY_RECOVERY_PROBE_MS);
+    timer2.unref?.();
+    this.primaryProbe = timer2;
+  }
+  stopPrimaryRecoveryProbe() {
+    if (this.primaryProbe !== void 0) clearInterval(this.primaryProbe);
+    this.primaryProbe = void 0;
+    this.primaryProbeHits = 0;
+  }
+  /** Return to the primary server once it answers again, so a failover does not stick forever. */
+  async probePrimaryServer() {
+    const primaryUrl = this.primaryServerUrl;
+    if (primaryUrl === void 0 || this.closed || this.failoverInFlight) return;
+    const probe = new HostServerApi(primaryUrl, new ServerCredentialStore(this.identities.directory));
+    let healthy = false;
+    try {
+      healthy = await probe.checkHealth();
+    } finally {
+      probe.close();
+    }
+    if (this.closed || this.primaryServerUrl !== primaryUrl) return;
+    if (!healthy) {
+      this.primaryProbeHits = 0;
+      return;
+    }
+    this.primaryProbeHits += 1;
+    if (this.primaryProbeHits < PRIMARY_RECOVERY_CONFIRMATIONS) return;
+    this.stopPrimaryRecoveryProbe();
+    this.primaryServerUrl = void 0;
+    this.logger.warn("primary server is reachable again; switching the Host back", { to: primaryUrl });
+    this.switchServer(primaryUrl);
   }
   async readHarnessVersion() {
     const version2 = await readHarnessDistributionVersion();
@@ -89413,7 +89681,7 @@ function isPlainRecord(value) {
 // src/plugin-route-dispatcher.ts
 function createPluginRouteDispatcher(readConnection, readPort, peer) {
   let cookie;
-  return async (route, body, signal) => {
+  return async (route, body2, signal) => {
     signal.throwIfAborted();
     const connection = readConnection();
     const handler = connection?.createSharedFetchHandler?.("/api");
@@ -89422,7 +89690,7 @@ function createPluginRouteDispatcher(readConnection, readPort, peer) {
       response = await withSignal(handler.fetch(new Request(`http://127.0.0.1/${route}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(body ?? {}),
+        body: JSON.stringify(body2 ?? {}),
         signal
       }), peer), signal);
     } else {
@@ -89439,21 +89707,21 @@ function createPluginRouteDispatcher(readConnection, readPort, peer) {
       response = await fetch(`${origin}/${route}`, {
         method: "POST",
         headers: { "content-type": "application/json", ...cookie === void 0 ? {} : { cookie } },
-        body: JSON.stringify(body ?? {}),
+        body: JSON.stringify(body2 ?? {}),
         signal
       });
       if (response.status === 401) cookie = void 0;
     }
     const text = await response.text();
-    let json2 = null;
+    let json3 = null;
     if (text !== "") {
       try {
-        json2 = JSON.parse(text);
+        json3 = JSON.parse(text);
       } catch {
-        json2 = text;
+        json3 = text;
       }
     }
-    return { status: response.status, json: json2 };
+    return { status: response.status, json: json3 };
   };
 }
 function withSignal(pending, signal) {
@@ -89646,7 +89914,7 @@ ${helpText()}`);
 }
 async function register(args, runtime) {
   if (args.length !== 1 || args[0] === void 0 || args[0].trim() === "") {
-    throw new CliUsageError("Usage: ds-harness-remote register <server-token>");
+    throw new CliUsageError("Usage: dsh-agent-remote register <server-token>");
   }
   const context = await hostContext(runtime);
   await context.api.authorizeHostWithCode(context.identity, args[0]);
@@ -89654,20 +89922,20 @@ async function register(args, runtime) {
   return 0;
 }
 async function login(args, runtime) {
-  if (args.length > 1) throw new CliUsageError("Usage: ds-harness-remote login [provider|list]");
+  if (args.length > 1) throw new CliUsageError("Usage: dsh-agent-remote login [provider|list]");
   const context = await hostContext(runtime);
   const providers = (await context.api.oauthProviders()).filter((item) => item.qrStartUrl != null);
   if (args[0] === "list") {
-    write(runtime.stdout, providers.length === 0 ? "No QR sign-in providers are available.\n" : providers.map((item) => `${item.displayName}: ds-harness-remote login ${item.id}
+    write(runtime.stdout, providers.length === 0 ? "No QR sign-in providers are available.\n" : providers.map((item) => `${item.displayName}: dsh-agent-remote login ${item.id}
 `).join(""));
     return 0;
   }
   const selected = args[0] === void 0 ? providers.find((item) => item.id === "zhihu") ?? providers[0] : providers.find((item) => item.id === args[0]);
-  if (selected === void 0) throw new CliUsageError('OAuth provider unavailable. Run "ds-harness-remote login list" to see available providers.');
+  if (selected === void 0) throw new CliUsageError('OAuth provider unavailable. Run "dsh-agent-remote login list" to see available providers.');
   const provider = selected.id;
   const session2 = await context.api.startOAuthQrLogin(provider);
   const qr = await runtime.renderQr(session2.scanUrl);
-  write(runtime.stdout, `Using ${selected.displayName} QR login. Run "ds-harness-remote login list" for available providers.
+  write(runtime.stdout, `Using ${selected.displayName} QR login. Run "dsh-agent-remote login list" for available providers.
 `);
   write(runtime.stdout, "Scan this QR code to authorize this Host:\n\n");
   write(runtime.stdout, `${qr.trimEnd()}
@@ -89702,7 +89970,7 @@ Waiting for authorization...
   return 1;
 }
 async function status(args, runtime) {
-  if (args.length !== 0) throw new CliUsageError("Usage: ds-harness-remote status");
+  if (args.length !== 0) throw new CliUsageError("Usage: dsh-agent-remote status");
   const serverUrl = selectedServer();
   const root = new IdentityStore({ env: runtime.env }).directory;
   const directory = serverStorageDirectory(root, serverUrl, "host");
@@ -89715,7 +89983,7 @@ async function status(args, runtime) {
     lines.push("Device: not initialized", "Authorization: logged out", "Credential: unavailable");
     write(runtime.stdout, `${lines.join("\n")}
 
-Run "ds-harness-remote login" or use "/remote login" in dsh-TUI.
+Run "dsh-agent-remote login" or use "/remote login" in dsh-TUI.
 `);
     return 0;
   }
@@ -89729,7 +89997,7 @@ Run "ds-harness-remote login" or use "/remote login" in dsh-TUI.
     lines.push("Authorization: logged out", "Credential: unavailable");
     write(runtime.stdout, `${lines.join("\n")}
 
-Run "ds-harness-remote login" or use "/remote login" in dsh-TUI.
+Run "dsh-agent-remote login" or use "/remote login" in dsh-TUI.
 `);
     return 0;
   }
@@ -89752,7 +90020,7 @@ Run "ds-harness-remote login" or use "/remote login" in dsh-TUI.
   }
 }
 async function logout(args, runtime) {
-  if (args.length !== 0) throw new CliUsageError("Usage: ds-harness-remote logout");
+  if (args.length !== 0) throw new CliUsageError("Usage: dsh-agent-remote logout");
   const serverUrl = selectedServer();
   const root = new IdentityStore({ env: runtime.env }).directory;
   const directory = serverStorageDirectory(root, serverUrl, "host");
@@ -89861,10 +90129,10 @@ function cliErrorMessage(error62) {
 function helpText() {
   return [
     "Usage:",
-    "  ds-harness-remote login [provider|list]",
-    "  ds-harness-remote register <server-token>",
-    "  ds-harness-remote status",
-    "  ds-harness-remote logout",
+    "  dsh-agent-remote login [provider|list]",
+    "  dsh-agent-remote register <server-token>",
+    "  dsh-agent-remote status",
+    "  dsh-agent-remote logout",
     "",
     "Inside dsh-TUI, use /remote login, /remote status, or /remote logout.",
     "login uses an available QR provider (preferring Zhihu). Use login list to see available providers.",
@@ -89936,7 +90204,7 @@ function installTuiRemoteCommand(ctx, resolveTarget) {
           if (scenes === void 0) {
             return {
               kind: "error",
-              text: `The Remote login screen is unavailable. Run "ds-harness-remote login ${provider}" outside dsh-TUI, then restart it.`
+              text: `The Remote login screen is unavailable. Run "dsh-agent-remote login ${provider}" outside dsh-TUI, then restart it.`
             };
           }
           login2.start(provider);
@@ -89972,7 +90240,7 @@ function installTuiRemoteCommand(ctx, resolveTarget) {
     return () => {
       disposeCommand();
     };
-  }, "ds-harness-remote: dsh-tui /remote command");
+  }, "dsh-agent-remote: dsh-tui /remote command");
   tuiContext.inject(["tuiCommandTrees"], (treeContext) => {
     treeContext.effect(() => {
       const trees = treeContext.get("tuiCommandTrees", false);
@@ -89984,7 +90252,7 @@ function installTuiRemoteCommand(ctx, resolveTarget) {
         },
         children: (path) => remoteCommandChildren(path, login2.completionProviders())
       }));
-    }, "ds-harness-remote: dsh-TUI /remote completion");
+    }, "dsh-agent-remote: dsh-TUI /remote completion");
   });
   tuiContext.inject(["tuiScenes"], (sceneContext) => {
     sceneContext.effect(() => {
@@ -90003,9 +90271,9 @@ function installTuiRemoteCommand(ctx, resolveTarget) {
         disposeScene();
         disposeStatusScene();
       };
-    }, "ds-harness-remote: dsh-TUI /remote scenes");
+    }, "dsh-agent-remote: dsh-TUI /remote scenes");
   });
-  tuiContext.effect(() => () => login2.cancel(), "ds-harness-remote: dsh-TUI /remote login");
+  tuiContext.effect(() => () => login2.cancel(), "dsh-agent-remote: dsh-TUI /remote login");
 }
 function registerRemoteCommand(ctx, commands, pluginHost, definition) {
   if (pluginHost === void 0) return commands.register(definition);
@@ -90064,7 +90332,7 @@ function remoteCommandChildren(canonicalPath, providers) {
 }
 function remoteStatusLines(target3) {
   if (target3 === void 0) {
-    return ["Remote Host is disabled or still starting. Check the ds-harness-remote settings and retry."];
+    return ["Remote Host is disabled or still starting. Check the dsh-agent-remote settings and retry."];
   }
   const { runtime, config: config2 } = target3;
   const status2 = runtime.hostStatus();
@@ -90104,7 +90372,7 @@ function remoteCommandUsage() {
 function remoteNotReady() {
   return {
     kind: "error",
-    text: "Remote Host is disabled or still starting. Check the ds-harness-remote settings and retry."
+    text: "Remote Host is disabled or still starting. Check the dsh-agent-remote settings and retry."
   };
 }
 var RemoteLoginController = class {
@@ -90341,8 +90609,8 @@ function runHmrSafe(run, hmr) {
 
 // src/update-check.ts
 var DIST_TAG_URLS = [
-  "https://registry.npmjs.org/-/package/ds-harness-remote/dist-tags",
-  "https://registry.npmmirror.com/-/package/ds-harness-remote/dist-tags"
+  "https://registry.npmjs.org/-/package/dsh-agent-remote/dist-tags",
+  "https://registry.npmmirror.com/-/package/dsh-agent-remote/dist-tags"
 ];
 var FETCH_TIMEOUT_MS = 1e4;
 var RECHECK_INTERVAL_MS = 24 * 60 * 60 * 1e3;
@@ -90440,6 +90708,701 @@ var PluginUpdateChecker = class {
     }
   }
 };
+
+// src/self-host.ts
+import { mkdirSync as mkdirSync2 } from "node:fs";
+import { networkInterfaces as networkInterfaces3 } from "node:os";
+import { join as join17 } from "node:path";
+
+// ../../apps/server/dist/server.js
+import { createServer as createServer4 } from "node:http";
+import { existsSync as existsSync6, readFileSync as readFileSync3, readdirSync as readdirSync3 } from "node:fs";
+import { join as join16 } from "node:path";
+import { fileURLToPath as fileURLToPath3 } from "node:url";
+import { randomUUID as randomUUID19 } from "node:crypto";
+
+// ../../apps/server/dist/store.js
+import { createHash as createHash7, randomBytes as randomBytes13, scryptSync, timingSafeEqual as timingSafeEqual2 } from "node:crypto";
+import { existsSync as existsSync5, mkdirSync, readFileSync as readFileSync2, renameSync, writeFileSync } from "node:fs";
+import { dirname as dirname7 } from "node:path";
+var ApiError = class extends Error {
+  code;
+  status;
+  constructor(code, status2 = 400) {
+    super(code);
+    this.code = code;
+    this.status = status2;
+  }
+};
+var hash3 = (value) => createHash7("sha256").update(value).digest("hex");
+var secret = () => randomBytes13(32).toString("base64url");
+var equal = (left, right) => timingSafeEqual2(Buffer.from(hash3(left)), Buffer.from(hash3(right)));
+var tokenSchema = external_exports.object({ kind: external_exports.enum(["access", "refresh"]), deviceId: external_exports.string(), expires: external_exports.number(), used: external_exports.boolean() });
+var savedDeviceSchema = external_exports.object({ descriptor: accountDeviceDescriptorSchema, revoked: external_exports.boolean(), lastSeenAt: external_exports.number() });
+var stateSchema = external_exports.object({ version: external_exports.literal(1), account: external_exports.string(), salt: external_exports.string(), verifier: external_exports.string(), devices: external_exports.record(external_exports.string(), savedDeviceSchema), tokens: external_exports.record(external_exports.string(), tokenSchema) });
+var Store = class {
+  file;
+  account;
+  state;
+  onInvalidate = () => {
+  };
+  constructor(file2, account, password) {
+    this.file = file2;
+    this.account = account;
+    const previous = existsSync5(file2) ? stateSchema.parse(JSON.parse(readFileSync2(file2, "utf8"))) : void 0;
+    const salt = previous?.salt ?? secret();
+    const verifier = scryptSync(password, salt, 32).toString("hex");
+    this.state = previous ?? { version: 1, account, salt, verifier, devices: {}, tokens: {} };
+    if (this.state.account !== account)
+      this.state.devices = {};
+    if (this.state.account !== account || !equal(this.state.verifier, verifier))
+      this.state.tokens = {};
+    Object.assign(this.state, { account, verifier });
+    this.save();
+  }
+  save() {
+    mkdirSync(dirname7(this.file), { recursive: true, mode: 448 });
+    const tmp = `${this.file}.tmp`;
+    writeFileSync(tmp, JSON.stringify(this.state), { mode: 384 });
+    renameSync(tmp, this.file);
+  }
+  get(id6) {
+    const d = Object.hasOwn(this.state.devices, id6) ? this.state.devices[id6] : void 0;
+    if (!d)
+      throw new ApiError("DEVICE_NOT_FOUND", 404);
+    if (d.revoked)
+      throw new ApiError("DEVICE_REVOKED", 403);
+    return d;
+  }
+  list() {
+    return Object.values(this.state.devices).filter((d) => !d.revoked);
+  }
+  register(descriptor) {
+    const old = this.state.devices[descriptor.deviceId];
+    if (old?.revoked)
+      throw new ApiError("DEVICE_REVOKED", 403);
+    if (old && (old.descriptor.identityKey !== descriptor.identityKey || old.descriptor.role !== descriptor.role))
+      throw new ApiError("PEER_IDENTITY_MISMATCH", 409);
+    if (!old && Object.keys(this.state.devices).length >= 256)
+      throw new ApiError("RATE_LIMITED", 429);
+    this.state.devices[descriptor.deviceId] = { descriptor, revoked: false, lastSeenAt: old?.lastSeenAt ?? 0 };
+    this.invalidate(descriptor.deviceId);
+    return this.issue(descriptor.deviceId);
+  }
+  issue(deviceId, refreshTokenExpiresAt = Date.now() + 30 * 864e5) {
+    for (const [key, value] of Object.entries(this.state.tokens))
+      if (value.expires <= Date.now())
+        delete this.state.tokens[key];
+    if (Object.keys(this.state.tokens).length >= 16384)
+      throw new ApiError("RATE_LIMITED", 429);
+    const accessToken = secret(), refreshToken = secret();
+    const accessTokenExpiresAt = Date.now() + 60 * 6e4;
+    this.state.tokens[hash3(accessToken)] = { kind: "access", deviceId, expires: accessTokenExpiresAt, used: false };
+    this.state.tokens[hash3(refreshToken)] = { kind: "refresh", deviceId, expires: refreshTokenExpiresAt, used: false };
+    this.save();
+    return { accessToken, refreshToken, accessTokenExpiresAt, refreshTokenExpiresAt };
+  }
+  authenticate(token) {
+    const record11 = this.state.tokens[hash3(token)];
+    if (!record11 || record11.kind !== "access")
+      throw new ApiError("AUTH_INVALID", 401);
+    if (record11.expires <= Date.now())
+      throw new ApiError("TOKEN_EXPIRED", 401);
+    return this.get(record11.deviceId);
+  }
+  refresh(deviceId, token) {
+    this.get(deviceId);
+    const record11 = this.state.tokens[hash3(token)];
+    if (!record11 || record11.kind !== "refresh" || record11.deviceId !== deviceId)
+      throw new ApiError("AUTH_INVALID", 401);
+    if (record11.expires <= Date.now())
+      throw new ApiError("TOKEN_EXPIRED", 401);
+    if (record11.used) {
+      this.invalidate(deviceId);
+      throw new ApiError("AUTH_INVALID", 401);
+    }
+    record11.used = true;
+    return this.issue(deviceId, record11.expires);
+  }
+  invalidate(deviceId) {
+    for (const [key, value] of Object.entries(this.state.tokens))
+      if (value.deviceId === deviceId)
+        delete this.state.tokens[key];
+    this.onInvalidate(deviceId);
+    this.save();
+  }
+  revoke(id6) {
+    this.get(id6).revoked = true;
+    this.invalidate(id6);
+  }
+  touch(id6, clientVersion, harnessVersion) {
+    const d = this.get(id6);
+    d.lastSeenAt = Date.now();
+    if (clientVersion)
+      d.descriptor.clientVersion = clientVersion.slice(0, 64);
+    if (d.descriptor.role === "host" && harnessVersion)
+      d.descriptor.harnessVersion = harnessVersion.slice(0, 64);
+    this.save();
+  }
+};
+
+// ../../apps/server/dist/gateway.js
+import { randomUUID as randomUUID18 } from "node:crypto";
+import { WebSocket as WebSocket4, WebSocketServer as WebSocketServer2 } from "ws";
+function modernHost(version2) {
+  const match = /^v?(\d+)\.(\d+)\.(\d+)(?:\+.*)?$/.exec(version2);
+  if (!match)
+    return false;
+  const [major, minor, patch] = match.slice(1).map(Number);
+  return major > 0 || (minor > 2 || minor === 2 && patch >= 15);
+}
+var Gateway = class {
+  store;
+  peers = /* @__PURE__ */ new Map();
+  links = /* @__PURE__ */ new Map();
+  wss = new WebSocketServer2({ noServer: true, maxPayload: MAX_RELAY_FRAME_BYTES, perMessageDeflate: false });
+  heartbeat;
+  constructor(server, store, origin) {
+    this.store = store;
+    store.onInvalidate = (id6) => this.disconnect(id6, "AUTH_INVALID");
+    server.on("upgrade", (req, socket, head) => {
+      if (req.url !== "/ws/v1/connect" || req.headers.origin && req.headers.origin !== origin || this.wss.clients.size >= 256) {
+        socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
+        return;
+      }
+      this.wss.handleUpgrade(req, socket, head, (ws) => this.accept(ws));
+    });
+    this.heartbeat = setInterval(() => {
+      for (const peer of this.peers.values()) {
+        if (Date.now() - peer.lastPong > 75e3) {
+          this.disconnect(peer.id, "CONNECTION_FAILED");
+          continue;
+        }
+        peer.nonce = randomUUID18();
+        this.send(peer, createControlFrame("ping", { nonce: peer.nonce }));
+      }
+      for (const link2 of this.links.values())
+        if (link2.stage !== "ready" && Date.now() - link2.created > 3e4)
+          this.drop(link2, "CONNECTION_FAILED");
+    }, 25e3);
+    this.heartbeat.unref();
+  }
+  send(peer, frame) {
+    if (peer.ws.readyState !== WebSocket4.OPEN)
+      return;
+    if (peer.ws.bufferedAmount > 4 * MAX_RELAY_FRAME_BYTES) {
+      this.disconnect(peer.id, "SLOW_CONSUMER");
+      return;
+    }
+    peer.ws.send(JSON.stringify(frame));
+  }
+  drop(link2, code) {
+    this.links.delete(link2.id);
+    for (const id6 of [link2.host, link2.client]) {
+      const p = this.peers.get(id6);
+      if (p && (p.role === "client" || modernHost(p.version)))
+        this.send(p, createControlFrame("error", { code, message: code, connectionId: link2.id, retryable: true }));
+    }
+  }
+  disconnect(id6, code) {
+    const peer = this.peers.get(id6);
+    this.peers.delete(id6);
+    for (const link2 of this.links.values())
+      if (link2.host === id6 || link2.client === id6)
+        this.drop(link2, code);
+    if (peer) {
+      peer.ws.close(code === "CONNECTION_REPLACED" ? 4003 : 4001, code);
+      setTimeout(() => peer.ws.terminate(), 1e3).unref();
+    }
+  }
+  accept(ws) {
+    let peer;
+    const deadline = setTimeout(() => ws.terminate(), 5e3);
+    let windowStart = Date.now(), frames = 0, bytes = 0;
+    ws.on("error", () => {
+    });
+    ws.on("close", () => {
+      clearTimeout(deadline);
+      if (peer && this.peers.get(peer.id) === peer)
+        this.disconnect(peer.id, "CONNECTION_FAILED");
+    });
+    ws.on("message", (raw, binary) => {
+      if (ws.readyState !== WebSocket4.OPEN)
+        return;
+      let frame;
+      try {
+        if (binary)
+          throw new ApiError("INVALID_MESSAGE");
+        const text = raw.toString();
+        if (Date.now() - windowStart >= 1e3) {
+          windowStart = Date.now();
+          frames = 0;
+          bytes = 0;
+        }
+        if (++frames > 512 || (bytes += Buffer.byteLength(text)) > 16 * MAX_RELAY_FRAME_BYTES)
+          throw new ApiError("RATE_LIMITED");
+        const envelope = JSON.parse(text);
+        if (envelope && envelope.v !== 1)
+          throw new ApiError("UNSUPPORTED_VERSION");
+        frame = decodeControlFrame(text);
+        if (!peer) {
+          if (frame.type !== "hello")
+            throw new ApiError("AUTH_REQUIRED");
+          const p = frame.payload;
+          const device = this.store.authenticate(p.accessToken).descriptor;
+          if (device.deviceId !== p.deviceId || device.role !== p.role)
+            throw new ApiError("AUTH_INVALID");
+          if (!p.protocols.includes(1))
+            throw new ApiError("UNSUPPORTED_VERSION");
+          this.disconnect(device.deviceId, "CONNECTION_REPLACED");
+          peer = { ws, id: device.deviceId, role: device.role, capabilities: p.capabilities, version: p.clientVersion ?? device.clientVersion, lastPong: Date.now() };
+          this.peers.set(peer.id, peer);
+          clearTimeout(deadline);
+          this.store.touch(peer.id, p.clientVersion, p.harnessVersion);
+          this.send(peer, createControlFrame("hello.ack", { protocol: 1, serverVersion: "self-hosted/0.1.0", connectionSessionId: randomUUID18(), heartbeatIntervalMs: 25e3, maxControlFrameBytes: MAX_CONTROL_FRAME_BYTES, maxRelayFrameBytes: MAX_RELAY_FRAME_BYTES, capabilities: p.capabilities.includes("transport.relay") ? ["transport.relay"] : [], webrtcEnabled: false, webrtcFallbackTimeoutMs: 1 }));
+          return;
+        }
+        if (this.peers.get(peer.id) !== peer)
+          throw new ApiError("AUTH_INVALID");
+        this.store.get(peer.id);
+        this.handle(peer, frame);
+      } catch (error62) {
+        const code = error62 instanceof ApiError ? error62.code : "INVALID_MESSAGE";
+        const connectionId = frame?.payload?.connectionId;
+        if (peer && typeof connectionId === "string" && code !== "RATE_LIMITED") {
+          const link2 = this.links.get(connectionId);
+          if (link2 && (link2.host === peer.id || link2.client === peer.id))
+            this.drop(link2, code);
+          else
+            this.send(peer, createControlFrame("error", { code, message: code, connectionId, retryable: false }));
+          return;
+        }
+        if (ws.readyState === WebSocket4.OPEN)
+          ws.send(JSON.stringify(createControlFrame("error", { code, message: code, retryable: false })));
+        if (peer)
+          this.disconnect(peer.id, code);
+        else {
+          ws.close(4001, code);
+          setTimeout(() => ws.terminate(), 1e3).unref();
+        }
+      }
+    });
+  }
+  handle(peer, frame) {
+    const p = frame.payload;
+    if (frame.type === "ping") {
+      this.send(peer, createControlFrame("pong", { nonce: p.nonce }));
+      return;
+    }
+    if (frame.type === "pong") {
+      if (peer.nonce && p.nonce === peer.nonce) {
+        peer.lastPong = Date.now();
+        peer.nonce = void 0;
+      }
+      return;
+    }
+    if (frame.type === "connect.request") {
+      const request = frame.payload;
+      if (peer.role !== "client")
+        throw new ApiError("MEMBERSHIP_REQUIRED");
+      const host = this.peers.get(request.hostDeviceId);
+      if (!host || host.role !== "host") {
+        this.send(peer, createControlFrame("error", { code: "HOST_OFFLINE", message: "Host is offline.", retryable: true }));
+        return;
+      }
+      this.store.get(host.id);
+      if (!request.preferredTransports.includes("relay") || !peer.capabilities.includes("transport.relay") || !host.capabilities.includes("transport.relay"))
+        throw new ApiError("CAPABILITY_NOT_SUPPORTED");
+      for (const old of this.links.values())
+        if (old.client === peer.id || old.host === host.id && !modernHost(host.version))
+          this.drop(old, "CONNECTION_REPLACED");
+      if (this.links.size >= 256)
+        throw new ApiError("RATE_LIMITED");
+      const link3 = { id: randomUUID18(), host: host.id, client: peer.id, stage: "pending", created: Date.now(), counters: /* @__PURE__ */ new Map() };
+      this.links.set(link3.id, link3);
+      this.send(host, createControlFrame("connect.incoming", { connectionId: link3.id, clientDeviceId: peer.id, clientIdentityKey: this.store.get(peer.id).descriptor.identityKey, authorization: "account", preferredTransports: ["relay"] }));
+      return;
+    }
+    const id6 = p.connectionId;
+    const link2 = typeof id6 === "string" ? this.links.get(id6) : void 0;
+    if (!link2 || peer.id !== link2.host && peer.id !== link2.client)
+      throw new ApiError("CONNECTION_NOT_FOUND");
+    const otherId = peer.id === link2.host ? link2.client : link2.host;
+    const other = this.peers.get(otherId);
+    this.store.get(otherId);
+    if (!other)
+      throw new ApiError("CONNECTION_FAILED");
+    if (frame.type === "connect.accepted" || frame.type === "connect.rejected") {
+      if (peer.id !== link2.host || link2.stage !== "pending")
+        throw new ApiError("INVALID_MESSAGE");
+      if (frame.type === "connect.rejected")
+        this.links.delete(link2.id);
+      else
+        link2.stage = "accepted";
+      this.send(other, frame);
+      return;
+    }
+    if (p.targetDeviceId !== otherId || link2.stage === "pending")
+      throw new ApiError("CONNECTION_NOT_FOUND");
+    if (frame.type === "transport.selected") {
+      if (peer.id !== link2.client || frame.payload.transport !== "relay")
+        throw new ApiError("CAPABILITY_NOT_SUPPORTED");
+      if (modernHost(other.version))
+        this.send(other, frame);
+      return;
+    }
+    if (frame.type.startsWith("signal."))
+      return;
+    if (frame.type === "secure.handshake") {
+      const step = frame.payload.step;
+      if (step === 1 && peer.id === link2.client && link2.stage === "accepted")
+        link2.stage = "handshake";
+      else if (step === 2 && peer.id === link2.host && link2.stage === "handshake")
+        link2.stage = "ready";
+      else
+        throw new ApiError("INVALID_MESSAGE");
+    } else if (frame.type === "relay") {
+      const counter = frame.payload.counter;
+      if (link2.stage !== "ready" || counter <= (link2.counters.get(peer.id) ?? -1))
+        throw new ApiError("INVALID_MESSAGE");
+      link2.counters.set(peer.id, counter);
+    } else
+      throw new ApiError("INVALID_MESSAGE");
+    this.send(other, frame);
+  }
+  close() {
+    clearInterval(this.heartbeat);
+    for (const ws of this.wss.clients)
+      ws.terminate();
+    this.wss.close();
+  }
+};
+
+// ../../apps/server/dist/server.js
+var loginSchema = external_exports.object({ email: external_exports.string().min(1).max(254), password: external_exports.string().min(1).max(1024) }).strict();
+var publicDir = fileURLToPath3(new URL("../dist/public/", import.meta.url));
+function readAssets() {
+  if (!existsSync6(publicDir))
+    return /* @__PURE__ */ new Map();
+  const assets = /* @__PURE__ */ new Map();
+  for (const entry of readdirSync3(publicDir, { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile())
+      continue;
+    const file2 = join16(entry.parentPath, entry.name);
+    const path = file2.slice(publicDir.length).replaceAll("\\", "/");
+    assets.set(path, readFileSync3(file2));
+  }
+  return assets;
+}
+async function body(req) {
+  if (!req.headers["content-type"]?.toLowerCase().startsWith("application/json"))
+    throw new ApiError("INVALID_MESSAGE", 415);
+  let length = 0;
+  const chunks = [];
+  for await (const chunk of req) {
+    length += chunk.length;
+    if (length > 16384)
+      throw new ApiError("FRAME_TOO_LARGE", 413);
+    chunks.push(chunk);
+  }
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  } catch {
+    throw new ApiError("INVALID_MESSAGE");
+  }
+}
+function createRemoteServer(config2) {
+  if (!config2.account.trim() || config2.password.length < 12)
+    throw new Error("DSH_SERVER_ACCOUNT and DSH_SERVER_PASSWORD (at least 12 characters) are required.");
+  const url2 = new URL(config2.publicUrl);
+  if (!["http:", "https:"].includes(url2.protocol) || url2.username || url2.password || url2.pathname !== "/" || url2.search || url2.hash)
+    throw new Error("DSH_SERVER_PUBLIC_URL must be an HTTP(S) origin.");
+  const store = new Store(config2.dataFile, config2.account.trim(), config2.password);
+  const assets = readAssets();
+  const sessions = /* @__PURE__ */ new Map();
+  const limits = /* @__PURE__ */ new Map();
+  function rate(key, max) {
+    for (const [k, v] of limits)
+      if (v.until < Date.now())
+        limits.delete(k);
+    let entry = limits.get(key);
+    if (!entry) {
+      if (limits.size >= 4096)
+        throw new ApiError("RATE_LIMITED", 429);
+      entry = { count: 0, until: Date.now() + 6e4 };
+      limits.set(key, entry);
+    }
+    if (++entry.count > max)
+      throw new ApiError("RATE_LIMITED", 429);
+  }
+  function token(req) {
+    const authorization = req.headers.authorization;
+    if (authorization)
+      return authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+    return /(?:^|;\s*)dsh_session=([A-Za-z0-9_-]+)/.exec(req.headers.cookie ?? "")?.[1] ?? "";
+  }
+  function accountAuth(req) {
+    const key = hash3(token(req));
+    if ((sessions.get(key) ?? 0) <= Date.now()) {
+      sessions.delete(key);
+      throw new ApiError("ACCOUNT_AUTH_REQUIRED", 401);
+    }
+  }
+  function deviceAuth(req) {
+    if (!req.headers.authorization?.startsWith("Bearer "))
+      throw new ApiError("AUTH_REQUIRED", 401);
+    return store.authenticate(req.headers.authorization.slice(7));
+  }
+  function cookie(value, age) {
+    return `dsh_session=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${url2.protocol === "https:" ? "; Secure" : ""}`;
+  }
+  const profile2 = () => ({ account: store.account, profile: { displayName: store.account }, isAdmin: false });
+  const server = createServer4({ requestTimeout: 15e3, headersTimeout: 1e4 }, (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Referrer-Policy", "no-referrer");
+    res.setHeader("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+    void route(req, res).catch((error62) => {
+      if (res.headersSent || res.destroyed)
+        return;
+      const e = error62 instanceof ApiError ? error62 : error62 instanceof external_exports.ZodError ? new ApiError("INVALID_MESSAGE") : new ApiError("INTERNAL_ERROR", 500);
+      if (e.status === 429)
+        res.setHeader("Retry-After", "60");
+      json2(res, e.status, { error: { code: e.code, message: e.code, requestId: randomUUID19(), retryable: e.status === 429 || e.status >= 500 } });
+    });
+  });
+  const gateway = new Gateway(server, store, url2.origin);
+  function descriptor(d) {
+    return { ...d.descriptor, membershipId: `account:${hash3(store.account).slice(0, 16)}`, online: gateway.peers.has(d.descriptor.deviceId), lastSeenAt: d.lastSeenAt };
+  }
+  async function route(req, res) {
+    const path = new URL(req.url ?? "/", url2).pathname;
+    const method = req.method;
+    if (req.headers.origin && req.headers.origin !== url2.origin)
+      throw new ApiError("AUTH_INVALID", 403);
+    if (req.headers["sec-fetch-site"] === "cross-site")
+      throw new ApiError("AUTH_INVALID", 403);
+    const staticAsset = path.startsWith("/assets/") || ["/icon.png", "/brand-whale.webp", "/landing-atmosphere.webp"].includes(path);
+    if (method === "GET" && (["/", "/app", "/app/login"].includes(path) || staticAsset)) {
+      const name2 = staticAsset ? path.slice(1) : "index.html";
+      const asset = assets.get(name2);
+      if (!asset)
+        throw new ApiError("METHOD_NOT_FOUND", 404);
+      const contentType2 = name2.endsWith(".js") ? "text/javascript; charset=utf-8" : name2.endsWith(".css") ? "text/css; charset=utf-8" : name2.endsWith(".png") ? "image/png" : name2.endsWith(".webp") ? "image/webp" : "text/html; charset=utf-8";
+      res.setHeader("Content-Type", contentType2);
+      res.end(asset);
+      return;
+    }
+    if (method === "GET" && (path === "/health" || path === "/healthz" || path === "/ready")) {
+      json2(res, 200, { status: "ok" });
+      return;
+    }
+    rate(`api:${req.socket.remoteAddress ?? ""}`, 240);
+    if (method === "POST" && path === "/api/v1/auth/login") {
+      rate(`login:${req.socket.remoteAddress ?? ""}`, 20);
+      const credentials = loginSchema.parse(await body(req));
+      if (!equal(credentials.email.trim(), store.account) || !equal(credentials.password, config2.password))
+        throw new ApiError("AUTH_INVALID", 401);
+      for (const [key, expires] of sessions)
+        if (expires <= Date.now())
+          sessions.delete(key);
+      if (sessions.size >= 256)
+        throw new ApiError("RATE_LIMITED", 429);
+      const value = secret(), expiresAt = Date.now() + 8 * 36e5;
+      sessions.set(hash3(value), expiresAt);
+      res.setHeader("Set-Cookie", cookie(value, 8 * 3600));
+      json2(res, 200, { ...profile2(), token: value, expiresAt });
+      return;
+    }
+    if (method === "GET" && path === "/api/v1/auth/me") {
+      accountAuth(req);
+      json2(res, 200, profile2());
+      return;
+    }
+    if (method === "POST" && path === "/api/v1/auth/logout") {
+      sessions.delete(hash3(token(req)));
+      res.setHeader("Set-Cookie", cookie("", 0));
+      json2(res, 200, { status: "ok" });
+      return;
+    }
+    if (method === "GET" && path === "/api/v1/account/devices") {
+      accountAuth(req);
+      json2(res, 200, { items: store.list().map(descriptor), serverUrl: url2.origin, transport: "relay" });
+      return;
+    }
+    if (method === "POST" && (path === "/api/v1/devices/register" || path === "/api/v1/devices/register-owned-role")) {
+      const source = path.endsWith("register-owned-role") ? deviceAuth(req) : void 0;
+      if (!source)
+        accountAuth(req);
+      const { device } = deviceRegistrationRequestSchema.parse(await body(req));
+      if (source && (source.descriptor.deviceId === device.deviceId || source.descriptor.role === device.role))
+        throw new ApiError("INVALID_MESSAGE", 409);
+      json2(res, 200, store.register(device));
+      return;
+    }
+    if (method === "POST" && path === "/api/v1/auth/refresh") {
+      const data2 = deviceRefreshRequestSchema.parse(await body(req));
+      json2(res, 200, store.refresh(data2.deviceId, data2.refreshToken));
+      return;
+    }
+    if (method === "DELETE" && path === "/api/v1/devices/self") {
+      store.revoke(deviceAuth(req).descriptor.deviceId);
+      json2(res, 200, { status: "revoked" });
+      return;
+    }
+    if (method === "GET" && path === "/api/v1/me") {
+      json2(res, 200, descriptor(deviceAuth(req)));
+      return;
+    }
+    if (method === "GET" && path === "/api/v1/devices") {
+      const source = deviceAuth(req);
+      if (source.descriptor.role !== "client")
+        throw new ApiError("MEMBERSHIP_REQUIRED", 403);
+      const items = store.list().filter((d) => d.descriptor.role === "host").map((d) => {
+        const { identityKey: _key, ...item } = descriptor(d);
+        return item;
+      });
+      json2(res, 200, { items, nextCursor: null });
+      return;
+    }
+    const match = /^\/api\/v1\/devices\/([^/]+)(\/presence)?$/.exec(path);
+    if (method === "GET" && match) {
+      const source = deviceAuth(req), target3 = store.get(match[1]);
+      if (source.descriptor.role === target3.descriptor.role)
+        throw new ApiError("MEMBERSHIP_REQUIRED", 403);
+      const d = descriptor(target3);
+      json2(res, 200, match[2] ? { deviceId: d.deviceId, online: d.online, lastSeenAt: d.lastSeenAt } : d);
+      return;
+    }
+    throw new ApiError("METHOD_NOT_FOUND", 404);
+  }
+  return { server, store, gateway, close: async () => {
+    gateway.close();
+    server.closeAllConnections();
+    await new Promise((resolve7, reject) => server.close((error62) => error62 ? reject(error62) : resolve7()));
+  } };
+}
+function json2(res, status2, value) {
+  res.writeHead(status2, { "Content-Type": "application/json; charset=utf-8" });
+  res.end(JSON.stringify(value));
+}
+
+// src/self-host.ts
+function detectLanIpv4() {
+  for (const [name2, addresses] of Object.entries(networkInterfaces3())) {
+    if (/^(loopback|vethernet|vmware|virtualbox|docker)/i.test(name2)) continue;
+    for (const address2 of addresses ?? []) {
+      if (address2.family === "IPv4" && !address2.internal) return address2.address;
+    }
+  }
+  return "127.0.0.1";
+}
+function startSelfHost(options) {
+  if (options.account.trim().length === 0) {
+    throw new Error("Self-hosted server requires an account.");
+  }
+  if (options.password.length < 12) {
+    throw new Error("Self-hosted server requires a password with at least 12 characters.");
+  }
+  const publicUrl = options.publicUrl?.trim() || `http://${detectLanIpv4()}:${options.port}`;
+  const dataFile = join17(options.dataDirectory, "state.json");
+  mkdirSync2(options.dataDirectory, { recursive: true });
+  const app = createRemoteServer({
+    account: options.account.trim(),
+    password: options.password,
+    publicUrl,
+    dataFile
+  });
+  app.server.listen(options.port, "0.0.0.0");
+  return {
+    publicUrl,
+    close: () => app.close()
+  };
+}
+
+// src/cloudflare-tunnel.ts
+import { spawn as spawn7 } from "node:child_process";
+import { createWriteStream, existsSync as existsSync7, mkdirSync as mkdirSync3, rmSync } from "node:fs";
+import { join as join18 } from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+var DOWNLOAD_URLS = [
+  "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe",
+  "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64"
+];
+function binaryPath(directory) {
+  const name2 = process.platform === "win32" ? "cloudflared.exe" : "cloudflared";
+  return join18(directory, name2);
+}
+async function downloadBinary(directory, logger2) {
+  const target3 = binaryPath(directory);
+  if (existsSync7(target3)) return target3;
+  mkdirSync3(directory, { recursive: true });
+  let lastError;
+  for (const url2 of DOWNLOAD_URLS) {
+    try {
+      logger2.info("downloading cloudflared", { url: url2 });
+      const response = await fetch(url2, { redirect: "follow" });
+      if (!response.ok || response.body === null) throw new Error(`HTTP ${response.status}`);
+      const partial2 = `${target3}.partial`;
+      await pipeline(Readable.fromWeb(response.body), createWriteStream(partial2));
+      rmSync(target3, { force: true });
+      const { renameSync: renameSync2 } = await import("node:fs");
+      renameSync2(partial2, target3);
+      return target3;
+    } catch (error62) {
+      lastError = error62;
+      logger2.warn("cloudflared download failed", { url: url2, message: error62 instanceof Error ? error62.message : String(error62) });
+    }
+  }
+  throw new Error(`Could not download cloudflared (${lastError instanceof Error ? lastError.message : String(lastError)}). Place cloudflared manually in ${directory} or set a tunnel origin manually.`);
+}
+async function startCloudflareTunnel(options) {
+  if (options.token.trim().length === 0) throw new Error("Cloudflare Tunnel requires a tunnel token.");
+  const executable = await downloadBinary(options.binaryDirectory, options.logger);
+  let child;
+  let stopping = false;
+  const spawnTunnel = () => {
+    child = spawn7(executable, ["tunnel", "--no-autoupdate", "run", "--token", options.token], {
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true
+    });
+    child.stdout?.on("data", (chunk) => options.logger.info("cloudflared", { line: String(chunk).trim().slice(0, 200) }));
+    child.stderr?.on("data", (chunk) => options.logger.warn("cloudflared stderr", { line: String(chunk).trim().slice(0, 200) }));
+    child.on("exit", (code) => {
+      if (stopping) return;
+      options.logger.warn("cloudflared exited unexpectedly", { code });
+      setTimeout(() => {
+        if (!stopping) {
+          try {
+            spawnTunnel();
+          } catch (error62) {
+            options.logger.error("cloudflared restart failed", { message: error62 instanceof Error ? error62.message : String(error62) });
+          }
+        }
+      }, 5e3);
+    });
+  };
+  spawnTunnel();
+  return {
+    async close() {
+      stopping = true;
+      if (child !== void 0 && child.exitCode === null) {
+        child.kill();
+        await new Promise((resolve7) => {
+          const timer2 = setTimeout(resolve7, 3e3);
+          child?.once("exit", () => {
+            clearTimeout(timer2);
+            resolve7();
+          });
+        });
+      }
+    }
+  };
+}
+
+// src/index.ts
+import { join as join19 } from "node:path";
 
 // src/remote-file-content-provider.ts
 var REMOTE_FILE_SAVE_AS_MAX_BYTES = 100 * 1024 * 1024;
@@ -90557,11 +91520,11 @@ var AcpGateway = class {
 };
 
 // src/index.ts
-var name = "ds-harness-remote";
+var name = "dsh-agent-remote";
 var legacyLoaderModuleNames = /* @__PURE__ */ new Set(["dsh-remote", "@dsh-remote/plugin"]);
-var pluginSettingsNamespace = "ds-harness-remote";
+var pluginSettingsNamespace = "dsh-agent-remote";
 var legacySettingsNamespace = "dsh-remote";
-var DEFAULT_ENTRY_ID = "ds-harness-remote";
+var DEFAULT_ENTRY_ID = "dsh-agent-remote";
 var INCLUDE_ENTRY_PREFIX = "include:";
 function apply(ctx, entry = void 0) {
   const readConfig = () => readEntryConfig(entry);
@@ -90571,7 +91534,7 @@ function apply(ctx, entry = void 0) {
     if (isLegacySettingsProvider(settings)) return;
     settingsContext.effect(() => settings.configure({ auto: false }, ctx.fiber));
   });
-  const tuiEntry = entryId === "ds-harness-remote-tui";
+  const tuiEntry = entryId === "dsh-agent-remote-tui";
   const tuiCommandsAvailable = ctx.get("commands", false) !== void 0 && (tuiEntry || ctx.get("tuiScenes", false) !== void 0);
   const tuiBinding = tuiCommandsAvailable ? {} : void 0;
   if (tuiBinding !== void 0) installTuiRemoteCommand(ctx, () => tuiBinding.target);
@@ -90615,7 +91578,7 @@ async function activate(ctx, readConfig, entryId, tuiBinding) {
   const connection = ctx.get("connection");
   const webServer = ctx.get("webServer");
   const resolvedConfig = resolveConfig(settingsBinding?.get() ?? readConfig());
-  const config2 = connection === void 0 && resolvedConfig.serverUrl === void 0 ? { ...resolvedConfig, serverUrl: DEFAULT_REMOTE_SERVER_URL } : resolvedConfig;
+  let config2 = connection === void 0 && resolvedConfig.serverUrl === void 0 ? { ...resolvedConfig, serverUrl: DEFAULT_REMOTE_SERVER_URL } : resolvedConfig;
   const defaultIdentityDirectory = new IdentityStore().directory;
   if (!config2.enabled) {
     if (connection !== void 0) {
@@ -90693,6 +91656,58 @@ async function activate(ctx, readConfig, entryId, tuiBinding) {
     }
     return { runtime: runtime2, clientRuntime: clientRuntime2 };
   };
+  let selfHost;
+  let selfHostKey;
+  let tunnel;
+  const ensureSelfHost = (target3) => {
+    if (!target3.selfHost.enabled) return target3;
+    const key = [target3.selfHost.port, target3.selfHost.account, target3.selfHost.password, target3.selfHost.publicUrl ?? ""].join("|");
+    if (selfHostKey !== key) {
+      void selfHost?.close();
+      selfHost = void 0;
+      selfHostKey = void 0;
+      try {
+        selfHost = startSelfHost({
+          port: target3.selfHost.port,
+          account: target3.selfHost.account,
+          password: target3.selfHost.password,
+          dataDirectory: join19(defaultIdentityDirectory, "self-host"),
+          ...target3.selfHost.publicUrl === void 0 ? {} : { publicUrl: target3.selfHost.publicUrl }
+        });
+        selfHostKey = key;
+        logger2.info("self-hosted remote server started", { url: selfHost.publicUrl });
+      } catch (error62) {
+        logger2.error("self-hosted remote server failed to start", {
+          message: error62 instanceof Error ? error62.message : String(error62)
+        });
+        return target3;
+      }
+    }
+    if (target3.selfHost.tunnel.mode === "named" && target3.selfHost.tunnel.token.trim() !== "") {
+      if (target3.selfHost.publicUrl === void 0) {
+        logger2.warn("cloudflare tunnel requires selfHost.publicUrl (https://domain) for Host and clients");
+      }
+      if (tunnel === void 0) {
+        void startCloudflareTunnel({
+          token: target3.selfHost.tunnel.token,
+          binaryDirectory: join19(defaultIdentityDirectory, "self-host", "cloudflared"),
+          logger: logger2
+        }).then((runtime2) => {
+          tunnel = runtime2;
+          logger2.info("cloudflare tunnel started", { localUrl: `http://127.0.0.1:${target3.selfHost.port}` });
+        }).catch((error62) => {
+          logger2.error("cloudflare tunnel failed to start", {
+            message: error62 instanceof Error ? error62.message : String(error62)
+          });
+        });
+      }
+    }
+    return {
+      ...target3,
+      ...target3.fallbackServerUrl === void 0 && selfHost !== void 0 ? { fallbackServerUrl: selfHost.publicUrl } : {}
+    };
+  };
+  config2 = ensureSelfHost(config2);
   let { runtime, clientRuntime } = createRuntimes(config2);
   let closed = false;
   let clientServiceProvided = clientRuntime !== void 0;
@@ -90706,7 +91721,7 @@ async function activate(ctx, readConfig, entryId, tuiBinding) {
       const failure5 = shutdown.find((result) => result.status === "rejected");
       if (failure5?.status === "rejected") throw failure5.reason;
       if (closed) throw new Error("Remote plugin is closed");
-      const fresh = createRuntimes(next);
+      const fresh = createRuntimes(ensureSelfHost(next));
       try {
         await fresh.runtime.start();
         await fresh.clientRuntime?.start();
@@ -90770,6 +91785,8 @@ async function activate(ctx, readConfig, entryId, tuiBinding) {
       await disposeControl?.();
       await clientRuntime?.close();
       await runtime.close();
+      await selfHost?.close().catch(() => void 0);
+      await tunnel?.close().catch(() => void 0);
     };
   }, "dsh-remote lifecycle");
   if (config2.remoteTools?.enabled) installRemoteDiscoveryTools(ctx, () => closed ? void 0 : clientRuntime);

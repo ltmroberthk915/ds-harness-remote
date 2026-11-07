@@ -1158,7 +1158,7 @@ export function createRemoteWorkspaceAction(React: ClientReact, portal?: PortalR
               React.createElement('strong', null, selectedHost?.name ?? t('remoteTitle')),
               selectedHost === undefined ? React.createElement('a', {
                 className: 'dshRemoteStarLink',
-                href: 'https://github.com/liguobao/ds-harness-remote',
+                href: 'https://github.com/liguobao/dsh-agent-remote',
                 target: '_blank',
                 rel: 'noreferrer',
               }, t('starProject')) : null),
@@ -1193,7 +1193,7 @@ export function createRemoteWorkspaceAction(React: ClientReact, portal?: PortalR
             needsAuthorization ? React.createElement('section', { className: 'dshRemoteEnable' },
               React.createElement('div', { className: 'dshRemoteLoginHeading' },
                 React.createElement('a', {
-                  href: 'https://github.com/liguobao/ds-harness-remote',
+                  href: 'https://github.com/liguobao/dsh-agent-remote',
                   target: '_blank', rel: 'noopener noreferrer',
                 },
                   React.createElement('strong', { className: 'dshRemoteLoginTitle' }, t('signInClient')),
@@ -1344,7 +1344,7 @@ export function createRemoteWorkspaceAction(React: ClientReact, portal?: PortalR
                     React.createElement('span', null, status?.target?.name ?? status?.deviceName ?? status?.host?.account ?? t('account')),
                     updateNotice === undefined ? null : React.createElement('a', {
                       className: 'dshRemoteAccountUpdate',
-                      href: 'https://github.com/liguobao/ds-harness-remote/releases',
+                      href: 'https://github.com/liguobao/dsh-agent-remote/releases',
                       target: '_blank',
                       rel: 'noreferrer',
                       title: updateNotice,

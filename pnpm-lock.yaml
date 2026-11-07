@@ -539,6 +539,9 @@ importers:
       '@dsh-remote/protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@dsh-remote/server':
+        specifier: workspace:*
+        version: link:../../apps/server
       '@dsh-remote/webrtc':
         specifier: workspace:*
         version: link:../webrtc

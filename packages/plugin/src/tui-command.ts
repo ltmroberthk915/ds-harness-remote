@@ -137,7 +137,7 @@ export function installTuiRemoteCommand(
           if (scenes === undefined) {
             return {
               kind: 'error',
-              text: `The Remote login screen is unavailable. Run "ds-harness-remote login ${provider}" outside dsh-TUI, then restart it.`,
+              text: `The Remote login screen is unavailable. Run "dsh-agent-remote login ${provider}" outside dsh-TUI, then restart it.`,
             }
           }
           login.start(provider)
@@ -173,7 +173,7 @@ export function installTuiRemoteCommand(
     return () => {
       disposeCommand()
     }
-  }, 'ds-harness-remote: dsh-tui /remote command')
+  }, 'dsh-agent-remote: dsh-tui /remote command')
 
   // These are optional TUI seams. Keep their fibers outside the Loader entry
   // dependency list so a stale/partial profile does not block Host startup,
@@ -190,7 +190,7 @@ export function installTuiRemoteCommand(
         },
         children: path => remoteCommandChildren(path, login.completionProviders()),
       }))
-    }, 'ds-harness-remote: dsh-TUI /remote completion')
+    }, 'dsh-agent-remote: dsh-TUI /remote completion')
   })
   tuiContext.inject(['tuiScenes'], sceneContext => {
     sceneContext.effect(() => {
@@ -209,9 +209,9 @@ export function installTuiRemoteCommand(
         disposeScene()
         disposeStatusScene()
       }
-    }, 'ds-harness-remote: dsh-TUI /remote scenes')
+    }, 'dsh-agent-remote: dsh-TUI /remote scenes')
   })
-  tuiContext.effect(() => () => login.cancel(), 'ds-harness-remote: dsh-TUI /remote login')
+  tuiContext.effect(() => () => login.cancel(), 'dsh-agent-remote: dsh-TUI /remote login')
 }
 
 function registerRemoteCommand(
@@ -283,7 +283,7 @@ function remoteCommandChildren(canonicalPath: readonly string[], providers: read
 
 function remoteStatusLines(target: TuiRemoteTarget | undefined): readonly string[] {
   if (target === undefined) {
-    return ['Remote Host is disabled or still starting. Check the ds-harness-remote settings and retry.']
+    return ['Remote Host is disabled or still starting. Check the dsh-agent-remote settings and retry.']
   }
   const { runtime, config } = target
   const status = runtime.hostStatus()
@@ -340,7 +340,7 @@ function remoteCommandUsage(): string {
 function remoteNotReady(): CommandResult {
   return {
     kind: 'error',
-    text: 'Remote Host is disabled or still starting. Check the ds-harness-remote settings and retry.',
+    text: 'Remote Host is disabled or still starting. Check the dsh-agent-remote settings and retry.',
   }
 }
 

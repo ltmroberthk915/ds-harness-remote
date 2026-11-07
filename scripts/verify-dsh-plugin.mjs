@@ -11,7 +11,7 @@ const pluginManifest = JSON.parse(readFileSync(join(root, 'packages/plugin/packa
 const componentManifest = JSON.parse(readFileSync(join(root, 'dsh-plugin.json'), 'utf8'))
 const pluginComponentManifest = JSON.parse(readFileSync(join(root, 'packages/plugin/dsh-plugin.json'), 'utf8'))
 
-assert.equal(manifest.name, 'ds-harness-remote', 'root package must use the canonical DSH installation id')
+assert.equal(manifest.name, 'dsh-agent-remote', 'root package must use the canonical DSH installation id')
 assert.equal(pluginManifest.name, manifest.name, 'root and npm plugin package ids must stay unified')
 assert.equal(pluginManifest.version, manifest.version, 'root and npm plugin versions must stay unified')
 assert.equal(componentManifest.name, manifest.name, 'root Component manifest must use the canonical plugin id')
@@ -41,14 +41,14 @@ assert.ok(
 )
 assert.equal(manifest.main, './index.js', 'root package must expose a prebuilt Host entry at package root')
 assert.equal(
-  manifest.bin?.['ds-harness-remote'],
-  './packages/plugin/bin/ds-harness-remote.js',
+  manifest.bin?.['dsh-agent-remote'],
+  './packages/plugin/bin/dsh-agent-remote.js',
   'root package must expose the TUI-compatible Remote CLI',
 )
 assert.equal(manifest.bin?.remote, undefined, 'root package must not install a standalone remote executable')
 assert.equal(
-  pluginManifest.bin?.['ds-harness-remote'],
-  './bin/ds-harness-remote.js',
+  pluginManifest.bin?.['dsh-agent-remote'],
+  './bin/dsh-agent-remote.js',
   'npm plugin package must expose the Remote CLI',
 )
 assert.equal(pluginManifest.bin?.remote, undefined, 'npm package must not install a standalone remote executable')
@@ -71,13 +71,13 @@ for (const file of [
   'packages/plugin/dist/index.js',
   'packages/plugin/dist/client.github.js',
   'packages/plugin/public.d.ts',
-  'packages/plugin/bin/ds-harness-remote.js',
+  'packages/plugin/bin/dsh-agent-remote.js',
 ]) {
   assert.ok(existsSync(join(root, file)), `DSH plugin artifact is missing: ${file}`)
 }
 
 const patch = readFileSync(join(root, 'cordis.patch.yml'), 'utf8')
-assert.match(patch, /^\s*- id:\s*ds-harness-remote\s*$/m, 'root patch must use the canonical Cordis instance id')
+assert.match(patch, /^\s*- id:\s*dsh-agent-remote\s*$/m, 'root patch must use the canonical Cordis instance id')
 assert.match(
   patch,
   new RegExp(`name:\\s*['"]?${manifest.name.replaceAll('-', '\\-')}['"]?`),
@@ -89,11 +89,38 @@ assert.match(
   'root patch must require only the dsh-TUI command service; optional UI seams must not block activation',
 )
 
+// The npm bundle patch shipped inside packages/plugin is what a profile actually applies when the
+// plugin is installed from the registry or a tarball. A stale instance/package id there inserts an
+// entry pointing at a module that no longer exists, and the plugin then looks enabled while never
+// activating (`1 entry did not activate`, or a silent no-op when the old package is absent).
+const packagePatch = readFileSync(join(root, 'packages/plugin/cordis.patch.yml'), 'utf8')
+assert.doesNotMatch(
+  packagePatch,
+  /ds-harness-remote/,
+  'npm bundle patch must not reference the legacy ds-harness-remote id',
+)
+assert.match(
+  packagePatch,
+  /^\s*- id:\s*dsh-agent-remote\s*$/m,
+  'npm bundle patch must use the canonical Cordis instance id',
+)
+assert.match(
+  packagePatch,
+  /^\s*- id:\s*dsh-agent-remote-tui\s*$/m,
+  'npm bundle patch must keep the dsh-TUI scoped instance id',
+)
+const packagePatchNames = [...packagePatch.matchAll(/^\s*name:\s*['"]?([^'"\s]+)['"]?\s*$/gm)].map(match => match[1])
+assert.deepEqual(
+  packagePatchNames,
+  ['dsh-agent-remote', 'dsh-agent-remote'],
+  'npm bundle patch entries must load the installed package id',
+)
+
 const rootHostEntry = readFileSync(join(root, 'index.js'), 'utf8')
 assert.match(rootHostEntry, /packages\/plugin\/dist\/index\.js/, 'root Host entry must forward to the committed bundle')
 
 const publicTypes = readFileSync(join(root, 'packages/plugin/public.d.ts'), 'utf8')
-assert.match(publicTypes, /name:\s*'ds-harness-remote'/, 'public types must expose the canonical plugin id')
+assert.match(publicTypes, /name:\s*'dsh-agent-remote'/, 'public types must expose the canonical plugin id')
 
 const hostBundle = readFileSync(join(root, 'packages/plugin/dist/index.js'), 'utf8')
 assert.doesNotMatch(hostBundle, /(?:from\s+|require\()['\"]@dsh-remote\//, 'Host bundle must not import unpublished workspace packages')
@@ -114,7 +141,7 @@ assert.doesNotMatch(
   /setInterval\(refresh/,
   'browser client must not poll the loopback status endpoint on a fixed interval',
 )
-assert.match(clientBundle, /localeNamespace\s*=\s*"ds-harness-remote"/, 'browser client locale namespace must use the canonical plugin id')
+assert.match(clientBundle, /localeNamespace\s*=\s*"dsh-agent-remote"/, 'browser client locale namespace must use the canonical plugin id')
 assert.match(clientBundle, /plugins\.row\.config/, 'browser client must contribute its options to the RC1 plugin row config surface')
 assert.match(clientBundle, /plugins\.bundle\.config/, 'browser client must keep contributing to the installed-bundle config surface')
 assert.doesNotMatch(

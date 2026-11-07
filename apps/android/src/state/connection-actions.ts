@@ -1,21 +1,116 @@
 import { browseScope, useBrowseMemory } from '../services/browse-memory'
 import { friendlyError, isSessionAuthError } from '../lib/errors'
 import { initialProbeTransports } from '../lib/network-route'
+import { normalizeServerUrl } from '../lib/server-url'
 import { strings as zhCN } from '../locales/i18n'
 import { resolveAutomaticPreferredTransports } from '../services/network-route'
 import { serverSession } from '../services/server-session'
+import { AccountRequiredError, type AuthenticatedServer } from '../services/server-session-manager'
+import { resolveServerTargets, FailoverPendingError } from '../services/server-failover'
+import { startPrimaryRecovery, stopPrimaryRecovery } from '../services/server-recovery'
 import { saveLastConnectedDeviceId } from '../services/storage'
+import type { DeviceIdentity, ServerConfig } from '../types'
 import type { SessionAccess } from './session-runtime'
 import type { AppState } from './store-state'
 import { disconnected } from './store-state'
 
 /** Connection actions use the store's single connection/session runtime. */
+// Once P2P fails on this network, stay on Relay for the whole app session.
+// The store is in-memory, so relaunching the app is the natural retry point:
+// a plain restart re-attempts P2P, while normal reconnects skip the
+// multi-second ICE penalty entirely.
+const RELAY_DOWNGRADE_MS = 100 * 365 * 24 * 60 * 60_000
+/** Host description is presentation data; it must never delay a usable link. */
+const HOST_DESCRIBE_TIMEOUT_MS = 2_000
+/**
+ * The Host only fails over after a sustained outage (two minutes by default),
+ * so a client that reached the primary outage first keeps retrying until the
+ * Host answers on the standby origin.
+ */
+const FAILOVER_RETRY_MS = 30_000
+const FAILOVER_RETRY_MAX_ATTEMPTS = 10
+
+interface AuthenticatedTarget extends AuthenticatedServer {
+  /** Origin the credentials belong to. */
+  baseUrl: string
+}
+
+/**
+ * Authenticate against the primary origin first, then the configured standby
+ * origin. Device credentials are stored per origin, so a standby the phone was
+ * authorized on before connects silently.
+ *
+ * Only reachability failures fail over: rejected credentials on a reachable
+ * primary are a login problem and must not silently move the app to another
+ * origin. When the standby has no device credential yet, the configured standby
+ * account authorizes this phone once, so later failovers need no user action.
+ */
+async function authenticateServerTargets(config: ServerConfig, identity: DeviceIdentity): Promise<AuthenticatedTarget> {
+  const primary = normalizeServerUrl(config.baseUrl)
+  const targets = resolveServerTargets(config)
+  for (const [index, target] of targets.entries()) {
+    const isPrimary = target === primary
+    try {
+      return { baseUrl: target, ...(await serverSession.authenticate(target, identity)) }
+    } catch (error) {
+      if (isPrimary) {
+        // Rejected credentials on a reachable primary are a login problem, not a
+        // reason to move to another origin.
+        if (isSessionAuthError(error) || index === targets.length - 1) throw error
+        continue
+      }
+      if (error instanceof AccountRequiredError) {
+        const account = config.fallbackAccount?.trim() ?? ''
+        const password = config.fallbackPassword ?? ''
+        if (account === '' || password === '') throw new Error(zhCN.settings.fallbackNote)
+        try {
+          return { baseUrl: target, ...(await serverSession.authenticateWithAccount(target, identity, account, password)) }
+        } catch (registerError) {
+          if (isSessionAuthError(registerError)) throw registerError
+          throw new FailoverPendingError(zhCN.runtime.failoverPending, registerError)
+        }
+      }
+      // The standby origin is unreachable or still reconnecting: the Host moves on
+      // its own two-minute timeline, so keep retrying instead of giving up.
+      throw new FailoverPendingError(zhCN.runtime.failoverPending, error)
+    }
+  }
+  throw new Error(zhCN.errors.serverUnreachable)
+}
+
 export function createConnectionActions({ get, set, runtime }: SessionAccess): Pick<AppState,
   'connectDevice' | 'reconnect' | 'resumeConnection' | 'refreshConnectionNetworkDetails' | 'disconnect' | 'setOffline'> {
+  let failoverRetryTimer: ReturnType<typeof setTimeout> | undefined
+  let failoverRetryAttempts = 0
+
+  const cancelFailoverRetry = () => {
+    if (failoverRetryTimer !== undefined) clearTimeout(failoverRetryTimer)
+    failoverRetryTimer = undefined
+    failoverRetryAttempts = 0
+  }
+
+  /** Retry while the Host may still be moving itself to the standby origin. */
+  const scheduleFailoverRetry = () => {
+    if (failoverRetryTimer !== undefined) return
+    if (failoverRetryAttempts >= FAILOVER_RETRY_MAX_ATTEMPTS) return
+    failoverRetryAttempts += 1
+    const timer = setTimeout(() => {
+      failoverRetryTimer = undefined
+      const current = get()
+      if (current.connection.phase !== 'offline' || current.selectedDevice === undefined) return
+      console.info('[dsh-remote] waiting for the Host on the standby origin; retrying')
+      void current.reconnect()
+    }, FAILOVER_RETRY_MS)
+    timer.unref?.()
+    failoverRetryTimer = timer
+  }
+
   return {
     async connectDevice(device, options = {}) {
       const { config, identity } = get()
       if (config === undefined || identity === undefined) return false
+      // Stage timings for the Settings diagnostics line (no payload data).
+      const connectStartedAt = Date.now()
       const generation = ++runtime.connectionGeneration
       ++runtime.sessionLoadGeneration
       runtime.sessionReadAbort?.abort()
@@ -29,7 +124,7 @@ export function createConnectionActions({ get, set, runtime }: SessionAccess): P
       // In-memory catalogs belong to one Host; keep them only across its reconnect.
       set(state => ({
         ...(!recovering ? { currentWorkSessionIds: [] } : {}),
-        ...(!sameHost ? { selectedSession: undefined, messages: {}, feedbackBySession: {} } : {}),
+        ...(!sameHost ? { selectedSession: undefined, messages: {}, feedbackBySession: {}, relayOnlyUntil: undefined } : {}),
         sessionLifecycles: {},
         sessionProjectionSeqs: {},
         permissionSelecting: false,
@@ -57,32 +152,48 @@ export function createConnectionActions({ get, set, runtime }: SessionAccess): P
         sessionModels: undefined,
         error: undefined,
       }))
+      let failoverAttempt = false
       try {
         await runtime.connection.prepareConnection(recovering)
         if (generation !== runtime.connectionGeneration) return false
         await runtime.closeActiveCodexStream(false)
         await runtime.closeActiveCursorStream(false)
-        const { api, credentials } = await serverSession.authenticate(config.baseUrl, identity)
+        const authStartedAt = Date.now()
+        const { api, credentials, baseUrl: serverBaseUrl } = await authenticateServerTargets(config, identity)
+        const authMs = Date.now() - authStartedAt
+        const failover = serverBaseUrl !== normalizeServerUrl(config.baseUrl)
+        failoverAttempt = failover
         const preference = get().transportPreference
-        const forceRelay = options.forceRelay === true || preference === 'relay'
+        const relayOnlyActive = (get().relayOnlyUntil ?? 0) > Date.now()
+        const forceRelay = options.forceRelay === true || preference === 'relay' || relayOnlyActive
         const preferredTransports = forceRelay
           ? ['relay'] as const
           : preference === 'turn'
             ? ['turn', 'relay'] as const
-            : await resolveAutomaticPreferredTransports()
+            : await resolveAutomaticPreferredTransports({ skipP2pOnRemote: get().cellularSkipP2p })
         if (generation !== runtime.connectionGeneration) return false
         set({ connectionStage: 'transport', connectionProbeOrder: initialProbeTransports(preferredTransports) })
+        const transportStartedAt = Date.now()
         await runtime.connection.connect(
-          config.baseUrl,
+          serverBaseUrl,
           identity,
           device,
           credentials.accessToken,
           frame => runtime.enqueueMuxFrame(generation, frame),
           {
-            refreshAccessToken: async () => (await serverSession.authenticate(config.baseUrl, identity)).credentials.accessToken,
+            refreshAccessToken: async () => (await serverSession.authenticate(serverBaseUrl, identity)).credentials.accessToken,
             fetchIceServers: async connectionId => api.turnCredentials(connectionId),
             preferredTransports: [...preferredTransports],
             forceRelay,
+            onWebRtcFallback: () => {
+              if (generation !== runtime.connectionGeneration) return
+              // Repeated negotiation failures on this host: remember to go
+              // straight to the relay data plane for a while.
+              runtime.webRtcFallbackStreak += 1
+              if (runtime.webRtcFallbackStreak >= 2) {
+                set({ relayOnlyUntil: Date.now() + RELAY_DOWNGRADE_MS })
+              }
+            },
             onOpencodeArchived: nativeId => {
               if (generation !== runtime.connectionGeneration) return
               const sessionId = `opencode:${nativeId}`
@@ -108,9 +219,17 @@ export function createConnectionActions({ get, set, runtime }: SessionAccess): P
               if (get().connection.phase !== 'disconnected') {
                 ++runtime.connectionGeneration
                 ++runtime.sessionLoadGeneration
+                // An established P2P/LAN/TURN path dropping is the unstable
+                // network case: remember relay-only for a while so recovery
+                // reconnects instantly over the relay instead of re-climbing
+                // LAN -> P2P -> TURN every time.
+                if (closeOptions?.lastTransport === 'lan' || closeOptions?.lastTransport === 'p2p' || closeOptions?.lastTransport === 'turn') {
+                  set({ relayOnlyUntil: Date.now() + RELAY_DOWNGRADE_MS })
+                }
                 set({
                   connection: { phase: 'offline', stats: { mode: 'Disconnected', connected: false }, error: zhCN.runtime.hostClosed,
                     retryable: closeOptions?.retryable !== false },
+                  connectionStage: undefined,
                   codexAvailable: false,
                   cursorAvailable: false,
                   antigravityAvailable: false,
@@ -128,9 +247,24 @@ export function createConnectionActions({ get, set, runtime }: SessionAccess): P
         set({ connectionStage: 'loading' })
         const proxy = runtime.connection.requireProxy()
         // Catalogs belong to the category the user opens, not connection setup.
-        const hostDescriptor = await proxy.hostDescribe()
-        const connectionNetworkDetails = await runtime.connection.getNetworkDetails().catch(() => undefined)
+        // Both reads are independent: run them together instead of paying two
+        // sequential round trips before the session can open. The Host
+        // description is presentation data: when it is slow, fall back to the
+        // previous value instead of delaying a usable connection.
+        const describeStartedAt = Date.now()
+        const fallbackDescriptor = get().hostDescriptor
+        const describeTimeout = new Promise<undefined>(resolve => {
+          setTimeout(() => resolve(undefined), HOST_DESCRIBE_TIMEOUT_MS)
+        })
+        const [hostDescriptor, connectionNetworkDetails] = await Promise.all([
+          Promise.race([proxy.hostDescribe().catch(() => undefined), describeTimeout])
+            .then(value => value ?? fallbackDescriptor),
+          runtime.connection.getNetworkDetails().catch(() => undefined),
+        ])
+        const describeMs = Date.now() - describeStartedAt
         if (generation !== runtime.connectionGeneration) return false
+        const connectedStats = runtime.connection.getStats() ?? { mode: 'Relay', connected: true }
+        runtime.webRtcFallbackStreak = 0
         set({
           hostDescriptor,
           codexAvailable: runtime.connection.hasCodex(),
@@ -142,24 +276,64 @@ export function createConnectionActions({ get, set, runtime }: SessionAccess): P
         hermesAvailable: runtime.connection.hasHermes(),
           connectionStage: 'ready',
           connectionNetworkDetails,
+          connectionTimings: {
+            total: Date.now() - connectStartedAt,
+            auth: authMs,
+            transport: describeStartedAt - transportStartedAt,
+            describe: describeMs,
+          },
           lastConnectedDeviceId: device.deviceId,
           pendingAutoConnectDeviceId: undefined,
-          connection: { phase: 'connected', stats: runtime.connection.getStats() ?? { mode: 'Relay', connected: true } },
+          activeServerUrl: serverBaseUrl,
+          serverFailover: failover,
+          failoverPending: false,
+          connection: { phase: 'connected', stats: connectedStats },
+          ...(connectedStats.mode !== 'Relay' && connectedStats.mode !== 'Disconnected' ? { relayOnlyUntil: undefined } : {}),
         })
         runtime.connectionStartedAt = Date.now()
         await saveLastConnectedDeviceId(device.deviceId)
+        cancelFailoverRetry()
+        if (failover) {
+          // Keep the working standby connection and return to the primary server
+          // only after it answered healthily twice in a row.
+          startPrimaryRecovery({
+            primaryUrl: normalizeServerUrl(config.baseUrl),
+            onRecovered: () => {
+              const current = get()
+              if (current.connection.phase !== 'connected' || current.serverFailover !== true) return
+              console.info('[dsh-remote] primary server recovered; switching back')
+              void get().reconnect()
+            },
+          })
+        } else {
+          stopPrimaryRecovery()
+        }
         return true
       } catch (error) {
         if (generation !== runtime.connectionGeneration) return false
-        console.warn('[dsh-remote] Connection setup failed at stage:', get().connectionStage, error)
+        // Capture before close(): the carrier's close handler clears it.
+        const failedStage = get().connectionStage
+        console.warn('[dsh-remote] Connection setup failed at stage:', failedStage, error)
         await runtime.connection.close({ preserveRecovery: recovering && !isSessionAuthError(error) })
         if (isSessionAuthError(error)) {
+          cancelFailoverRetry()
           await get().requireReauth(friendlyError(error))
           return false
         }
         const message = friendlyError(error)
+        // The primary origin is down and the standby origin is not serving this
+        // Host yet: the switch needs the Host's own outage window, so keep retrying
+        // in the background instead of leaving a dead end in front of the user.
+        const pendingFailover = error instanceof FailoverPendingError || failoverAttempt
+        // Failure inside transport negotiation means P2P/TURN could not
+        // establish: remember relay-only so the automatic retry (and the next
+        // manual attempt) skips the multi-second WebRTC wait entirely.
         set({
-          connection: { phase: 'offline', stats: { mode: 'Disconnected', connected: false }, error: message },
+          connection: { phase: 'offline', stats: { mode: 'Disconnected', connected: false }, error: message, retryable: true },
+          connectionStage: undefined,
+          ...(failedStage === 'transport' ? { relayOnlyUntil: Date.now() + RELAY_DOWNGRADE_MS } : {}),
+          serverFailover: false,
+          failoverPending: pendingFailover,
           codexAvailable: false,
           cursorAvailable: false,
           antigravityAvailable: false,
@@ -169,6 +343,7 @@ export function createConnectionActions({ get, set, runtime }: SessionAccess): P
           hermesAvailable: false,
           error: message,
         })
+        if (pendingFailover) scheduleFailoverRetry()
         return false
       }
     },
@@ -240,6 +415,8 @@ export function createConnectionActions({ get, set, runtime }: SessionAccess): P
     },
 
     async disconnect() {
+      cancelFailoverRetry()
+      stopPrimaryRecovery()
       runtime.flushPendingMuxFrames()
       ++runtime.connectionGeneration
       ++runtime.sessionLoadGeneration
@@ -279,6 +456,9 @@ export function createConnectionActions({ get, set, runtime }: SessionAccess): P
         historyHasMore: false,
         historyLoadingOlder: false,
         oldestLoadedSeq: undefined,
+        activeServerUrl: undefined,
+        serverFailover: undefined,
+        failoverPending: undefined,
       })
     },
 

@@ -24,6 +24,7 @@ import {
   loadDefaultPermissionPreset,
   loadFavoriteWorkspaces,
   loadCompactHistory,
+  loadCellularSkipP2p,
   loadLanguagePreference,
   loadLastConnectedDeviceId,
   loadOrCreateIdentity,
@@ -51,7 +52,7 @@ import { clearBrowseMemory } from '../services/browse-memory'
 import { initialData } from './store-state'
 
 type AccountActions = Pick<AppState,
-  'bootstrap' | 'requireReauth' | 'consumePendingAutoConnect' | 'configureServer' | 'selectServer' | 'startOAuth' | 'startGithubOAuth' | 'startGoogleOAuth' | 'completeOAuth' | 'listQrProviders' | 'listLoginProviders' | 'startQrLogin' | 'pollQrLogin' | 'completeQrLogin' | 'refreshDevices' | 'trustDevice' | 'renameDevice' | 'forgetDevice' | 'resetLocalData' | 'signOut'>
+  'bootstrap' | 'requireReauth' | 'consumePendingAutoConnect' | 'configureServer' | 'selectServer' | 'saveFallbackServer' | 'startOAuth' | 'startGithubOAuth' | 'startGoogleOAuth' | 'completeOAuth' | 'listQrProviders' | 'listLoginProviders' | 'startQrLogin' | 'pollQrLogin' | 'completeQrLogin' | 'refreshDevices' | 'trustDevice' | 'renameDevice' | 'forgetDevice' | 'resetLocalData' | 'signOut'>
 
 export function createAccountActions({ set, get }: StoreAccess): AccountActions {
   let accountGeneration = 0
@@ -106,7 +107,7 @@ export function createAccountActions({ set, get }: StoreAccess): AccountActions 
     async bootstrap() {
       set({ bootPhase: 'loading', error: undefined, pendingAutoConnectDeviceId: undefined, reauthRequired: false })
       try {
-        const [config, identity, transportPreference, languagePreference, themePreference, typographyDensity, statusBarVisible, favoriteWorkspaces, recentWorkspaces, lastConnectedDeviceId, defaultPermissionPreset, compactHistory] = await Promise.all([
+        const [config, identity, transportPreference, languagePreference, themePreference, typographyDensity, statusBarVisible, favoriteWorkspaces, recentWorkspaces, lastConnectedDeviceId, defaultPermissionPreset, compactHistory, cellularSkipP2p] = await Promise.all([
           loadServerConfig(),
           loadOrCreateIdentity(),
           loadTransportPreference(),
@@ -119,6 +120,7 @@ export function createAccountActions({ set, get }: StoreAccess): AccountActions 
           loadLastConnectedDeviceId(),
           loadDefaultPermissionPreset(),
           loadCompactHistory(),
+          loadCellularSkipP2p(),
         ])
         const language = applyLanguagePreference(languagePreference)
         set({
@@ -132,6 +134,7 @@ export function createAccountActions({ set, get }: StoreAccess): AccountActions 
           typographyDensity,
           statusBarVisible,
           compactHistory,
+          cellularSkipP2p,
           defaultPermissionPreset,
           favoriteWorkspaces,
           recentWorkspaces,
@@ -191,8 +194,42 @@ export function createAccountActions({ set, get }: StoreAccess): AccountActions 
       }
     },
 
-    async configureServer(input, email, password) {
-      set({ busyAction: passwordLoginChannel.busyAction, error: undefined })
+    async saveFallbackServer(input) {
+      const config = get().config
+      if (config === undefined) return false
+      set({ busyAction: 'fallback-server', error: undefined })
+      try {
+        const next: ServerConfig = { ...config }
+        const rawUrl = input.fallbackBaseUrl?.trim() ?? ''
+        if (rawUrl === '') {
+          // Explicitly cleared: keep the empty value so the build default does not
+          // silently re-enable the standby origin.
+          next.fallbackBaseUrl = ''
+        } else {
+          const url = normalizeServerUrl(rawUrl)
+          // A standby equal to the primary would only repeat the same attempt.
+          if (url === normalizeServerUrl(config.baseUrl)) {
+            set({ busyAction: undefined, error: zhCN.settings.fallbackSameAsPrimary })
+            return false
+          }
+          next.fallbackBaseUrl = url
+        }
+        const account = input.fallbackAccount?.trim() ?? ''
+        if (account === '') delete next.fallbackAccount
+        else next.fallbackAccount = account
+        const password = input.fallbackPassword ?? ''
+        if (password === '') delete next.fallbackPassword
+        else next.fallbackPassword = password
+        await saveServerConfig(next)
+        set({ busyAction: undefined, config: next })
+        return true
+      } catch (error) {
+        set({ busyAction: undefined, error: friendlyError(error) })
+        return false
+      }
+    },
+
+    async configureServer(input, email, password) {      set({ busyAction: passwordLoginChannel.busyAction, error: undefined })
       try {
         const identity = get().identity
         if (identity === undefined) throw new Error(zhCN.runtime.identityNotReady)

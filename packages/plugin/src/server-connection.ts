@@ -79,12 +79,24 @@ interface PendingTunnel {
   rtc?: RtcDataChannelTransport
   channel?: ServerNoiseChannel
   pendingHandshake?: SecureHandshakePayload
+  /** ICE candidates that arrived while the offer handler was still preparing the RTC backend. */
+  pendingIce?: SignalIcePayload['candidate'][]
   relayAssignment?: RelayAssignment
   dataSocket?: WebSocketLike
   dataReady?: boolean
 }
 
 const DEFAULT_WEBRTC_NEGOTIATE_TIMEOUT_MS = 12_000
+
+/** Retryable failures required before the Host considers the primary server gone. */
+const FAILOVER_MIN_FAILURES = 5
+/**
+ * A failover moves the Host to another origin, and Remote clients keep their device
+ * credentials per origin, so a short blip must self-heal instead of triggering a
+ * switch that would force every client to authorize again. Require a sustained
+ * outage; `config.failoverMinOutageMs` overrides this default.
+ */
+const DEFAULT_FAILOVER_MIN_OUTAGE_MS = 2 * 60_000
 
 export class HostServerConnection {
   private socket?: WebSocketLike
@@ -102,6 +114,12 @@ export class HostServerConnection {
   private negotiatedCapabilities: string[] = ['transport.relay']
   private controlFrameLimits: ControlFrameByteLimits = {}
   private webRtcNegotiateTimeoutMs = DEFAULT_WEBRTC_NEGOTIATE_TIMEOUT_MS
+  /** Consecutive retryable connection failures; used to trigger a server failover. */
+  private consecutiveFailures = 0
+  /** When the current failure streak started; a failover needs a sustained outage. */
+  private failingSince: number | undefined
+  /** The failover callback has already been requested for this connection. */
+  private failoverRequested = false
 
   constructor(
     private readonly config: ResolvedConfig,
@@ -114,6 +132,7 @@ export class HostServerConnection {
     private readonly rtcFactoryProvider?: () => Promise<RtcPeerConnectionFactory | undefined>,
     private readonly hostCapabilities: () => readonly string[] = () => [],
     private readonly harnessVersion?: string,
+    private readonly onFailover?: () => void,
   ) {}
 
   start(): void {
@@ -210,6 +229,19 @@ export class HostServerConnection {
         }
         if (TERMINAL_AUTH_ERRORS.has(code) || code === 'UNSUPPORTED_VERSION') { await this.dropTunnels(); return }
         if (!this.config.reconnect.enabled) return
+        this.consecutiveFailures += 1
+        this.failingSince ??= Date.now()
+        const minOutageMs = this.config.failoverMinOutageMs ?? DEFAULT_FAILOVER_MIN_OUTAGE_MS
+        if (
+          this.consecutiveFailures >= FAILOVER_MIN_FAILURES
+          && Date.now() - this.failingSince >= minOutageMs
+          && !this.failoverRequested
+          && this.onFailover !== undefined
+        ) {
+          this.failoverRequested = true
+          this.logger.warn('primary server kept failing; switching to the fallback server')
+          try { this.onFailover() } catch (failoverError) { this.logger.error('fallback server switch failed', { code: errorCode(failoverError) }) }
+        }
       }
       if (this.stopped) return
       if (this.reconnectRequested) {
@@ -298,11 +330,21 @@ export class HostServerConnection {
             }
             acknowledged = true
             clearTimeout(helloTimer)
+            // Warm the RTC backend right away: loading it lazily inside the
+            // first signal.offer handler added seconds to every first WebRTC
+            // negotiation and blocked the control frame queue.
+            if (this.rtcFactory === undefined && this.rtcFactoryProvider !== undefined && !this.config.forceRelay) {
+              void this.rtcFactoryProvider().then(factory => {
+                if (factory !== undefined) this.rtcFactory ??= factory
+              }).catch(() => undefined)
+            }
             for (const tunnel of [...this.tunnels.values()]) {
               const required = tunnel.transport === 'relay' ? RELAY_RESUME_CAPABILITY : WEBRTC_RESUME_CAPABILITY
               if (tunnel.lease && !this.negotiatedCapabilities.includes(required)) await this.dropTunnel(tunnel.connectionId)
             }
             this.online = true
+            this.consecutiveFailures = 0
+            this.failingSince = undefined
             this.terminalError = undefined
             this.logger.info('server control connection online', {
               serverVersion: payload.serverVersion,
@@ -398,7 +440,16 @@ export class HostServerConnection {
       return
     }
     if (frame.type === 'signal.offer') {
-      await this.handleSignalOffer(requireSignal(frame.payload))
+      if (!this.canUseWebRtc()) {
+        throw new ControlConnectionError('INVALID_MESSAGE', 'Server forwarded WebRTC signaling without negotiating it.')
+      }
+      // RTC backend loading and the TURN credential fetch must not block the
+      // serial control frame queue: ICE candidates and the secure handshake
+      // keep flowing while the offer is still being prepared.
+      void this.handleSignalOffer(requireSignal(frame.payload)).catch(error => {
+        if (this.stopped) return
+        this.logger.warn('webrtc offer handling failed', { reason: diagnosticReason(asError(error)) })
+      })
       return
     }
     if (frame.type === 'signal.ice') {
@@ -645,9 +696,6 @@ export class HostServerConnection {
   }
 
   private async handleSignalOffer(payload: SignalPayload): Promise<void> {
-    if (!this.canUseWebRtc()) {
-      throw new ControlConnectionError('INVALID_MESSAGE', 'Server forwarded WebRTC signaling without negotiating it.')
-    }
     const tunnel = this.tunnels.get(payload.connectionId)
     if (tunnel === undefined || payload.targetDeviceId !== this.identity.deviceId) {
       this.logger.warn('stale webrtc offer ignored', { connectionId: shortId(payload.connectionId) })
@@ -681,8 +729,10 @@ export class HostServerConnection {
         code: errorCode(error),
       })
     }
-    // Authorization/credentials can finish after this connection was dropped.
-    if (this.stopped || this.tunnels.get(tunnel.connectionId) !== tunnel || tunnel.rtc !== undefined || tunnel.channel !== undefined) return
+    // Authorization/credentials can finish after this connection was dropped
+    // or after the initiator gave up and selected the relay data plane.
+    if (this.stopped || this.tunnels.get(tunnel.connectionId) !== tunnel || tunnel.rtc !== undefined
+      || tunnel.channel !== undefined || tunnel.transport !== 'negotiating') return
     if (!tunnel.preferredTransports.includes('turn')) iceServers = stunOnlyIceServers(iceServers)
     const rtc = new RtcDataChannelTransport({
       role: 'responder',
@@ -713,6 +763,14 @@ export class HostServerConnection {
       void this.handleRtcFailed(tunnel, rtc, asError(error))
     })
     rtc.handleSignal({ type: 'offer', sdp: payload.sdp })
+    // Candidates that arrived while the RTC backend / TURN credentials were
+    // still loading. The data-channel transport buffers them itself until the
+    // remote description is set, so replay order is safe.
+    const buffered = tunnel.pendingIce
+    if (buffered !== undefined) {
+      tunnel.pendingIce = undefined
+      for (const candidate of buffered) rtc.handleSignal({ type: 'ice', candidate })
+    }
   }
 
   private handleSignalIce(payload: SignalIcePayload): void {
@@ -721,7 +779,15 @@ export class HostServerConnection {
     }
     const tunnel = this.tunnels.get(payload.connectionId)
     if (tunnel === undefined || payload.targetDeviceId !== this.identity.deviceId) return
-    tunnel.rtc?.handleSignal({ type: 'ice', candidate: payload.candidate })
+    const rtc = tunnel.rtc
+    if (rtc !== undefined) {
+      rtc.handleSignal({ type: 'ice', candidate: payload.candidate })
+      return
+    }
+    // The offer handler is still loading the RTC backend or TURN credentials.
+    // Buffer the candidate instead of dropping it: lost trickle ICE was a
+    // major source of slow or failed hole punching.
+    if (tunnel.channel === undefined) (tunnel.pendingIce ??= []).push(payload.candidate)
   }
 
   private async handleTransportSelected(payload: TransportSelectedPayload): Promise<void> {

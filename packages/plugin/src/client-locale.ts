@@ -1,5 +1,5 @@
 // Shared dictionaries and typing for the injected Remote client UI.
-export const localeNamespace = 'ds-harness-remote'
+export const localeNamespace = 'dsh-agent-remote'
 
 export const en = {
   remoteTools: 'Inject Remote Tools',
@@ -19,14 +19,14 @@ export const en = {
   previewLocalOnly: 'Preview requires Desktop or a browser connected to Harness on this computer.',
   settings: 'Settings',
 
-  pluginTitle: 'DeepSeek Remote',
+  pluginTitle: 'Agent Remote',
   pluginDescription: 'P2P-based, end-to-end encrypted remote access to DeepSeek Harness, CodeX, Claude Code, Pi, and other workspaces from web and mobile clients.',
   expandSettings: 'Show settings: {name}',
   collapseSettings: 'Hide settings: {name}',
   unsaved: 'Unsaved',
   associated: 'Authorized',
   authorizationComplete: 'Authorization complete',
-  loadingSettings: 'Loading DeepSeek Remote settings…',
+  loadingSettings: 'Loading Agent Remote settings…',
   mode: 'Mode',
   pluginMode: 'Plugin mode',
   host: 'Host',

@@ -95,6 +95,21 @@ export interface AppState {
   previewImageUri?: string
   setPreviewImageUri(uri?: string): void
   transportPreference: TransportPreference
+  /**
+   * Until this timestamp, connections to the current host skip WebRTC and go
+   * straight to the relay data plane. Set when an established P2P path drops
+   * or WebRTC negotiation keeps failing; expires so 'auto' can retry P2P.
+   */
+  relayOnlyUntil?: number
+  /** Last successful connect's stage timings, shown in Settings for diagnosis. */
+  connectionTimings?: { total: number; auth: number; transport: number; describe: number }
+  /**
+   * User opt-in: on 4G/5G (remote networks) go straight to Relay instead of
+   * spending the WebRTC budget on P2P attempts CGNAT never allows. Wi-Fi
+   * connections keep LAN/P2P priority regardless.
+   */
+  cellularSkipP2p: boolean
+  setCellularSkipP2p(value: boolean): Promise<void>
   compactHistory: boolean
   setCompactHistory(value: boolean): Promise<void>
   languagePreference: LanguagePreference
@@ -122,6 +137,14 @@ export interface AppState {
   pendingAutoConnectDeviceId?: string
   /** True when credentials are invalid and the UI should show the sign-in screen. */
   reauthRequired: boolean
+  /** Origin carrying the current connection; undefined before the first connect. */
+  activeServerUrl?: string
+  /** True while `activeServerUrl` is the configured standby origin. */
+  serverFailover?: boolean
+  /** The primary origin is down and the Host is expected to move to the standby origin. */
+  failoverPending?: boolean
+  /** Persist the standby origin and its one-time authorization account. */
+  saveFallbackServer(input: { fallbackBaseUrl?: string; fallbackAccount?: string; fallbackPassword?: string }): Promise<boolean>
 
   loadScheduleTasks(): Promise<void>
   deleteScheduleTask(sessionId: string, id: string): Promise<boolean>

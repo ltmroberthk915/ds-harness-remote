@@ -40,8 +40,12 @@ import type { AcpPeerBridge, PublishAcpFrame } from './acp/peer-bridge.js'
 import { RpcError } from './safe-error.js'
 import { CodexWorkspaceBridge, CodexWorkspaceState, type RemoteTerminalSpawner } from './codex-workspace-bridge.js'
 
-export interface HostConnectedClient {
-  deviceId: string
+/** How long a failed-over Host waits between probes of its primary server. */
+const PRIMARY_RECOVERY_PROBE_MS = 60_000
+/** Consecutive healthy probes required before the Host returns to its primary server. */
+const PRIMARY_RECOVERY_CONFIRMATIONS = 2
+
+export interface HostConnectedClient {  deviceId: string
   name: string
   platform?: string
   mode?: 'LAN' | 'P2P' | 'TURN' | 'Relay'
@@ -67,10 +71,15 @@ export class HostPluginRuntime {
   private terminalEnabled: boolean
   private loopbackPorts: readonly number[]
   private identity?: HostIdentity
-  private readonly serverApi?: HostServerApi
+  private serverApi?: HostServerApi
   private serverConnection?: HostServerConnection
   private harnessVersion?: string
   private closed = false
+  private failoverInFlight = false
+  /** Origin the Host left behind when it failed over; probed so a recovered primary is picked up. */
+  private primaryServerUrl?: string
+  private primaryProbe?: ReturnType<typeof setInterval>
+  private primaryProbeHits = 0
   private readonly codex: CodexRemoteDomain
   private readonly acp: AcpRemoteGateway
   private readonly codexWorkspaceState = new CodexWorkspaceState(key => TerminalPolicy.releaseOwner(this.terminalOwners, key))
@@ -80,7 +89,7 @@ export class HostPluginRuntime {
   private localAcpPublish: PublishAcpFrame = async () => undefined
 
   constructor(
-    private readonly config: ResolvedConfig,
+    private config: ResolvedConfig,
     private readonly identities: IdentityStore,
     private readonly logger: SafeLogger,
     private readonly localGateway?: LocalTypertGateway,
@@ -420,6 +429,7 @@ export class HostPluginRuntime {
   async close(): Promise<void> {
     if (this.closed) return
     this.closed = true
+    this.stopPrimaryRecoveryProbe()
     this.serverApi?.close()
     await this.serverConnection?.stop()
     await this.connections.close()
@@ -463,10 +473,123 @@ export class HostPluginRuntime {
       undefined,
       this.config.forceRelay
         ? undefined
-        : () => loadNodeRtcFactory({ routeTargets: this.config.serverUrl === undefined ? [] : [this.config.serverUrl] }),
+        : () => loadNodeRtcFactory({
+            routeTargets: this.config.serverUrl === undefined ? [] : [this.config.serverUrl],
+            iceIpv6: this.config.iceIpv6,
+          }),
       () => this.hostCapabilities(),
       this.harnessVersion,
+      () => this.switchToFallbackServer(),
     )
+  }
+
+  /**
+   * Move the Host to `targetUrl`: rebuild the origin-scoped server API and restart the
+   * control connection. Used both when the primary server keeps failing and when a
+   * recovered primary server is picked up again.
+   */
+  private switchServer(targetUrl: string, options: { authorizeFallbackAccount?: boolean } = {}): void {
+    if (this.closed || this.failoverInFlight) return
+    this.failoverInFlight = true
+    void (async () => {
+      try {
+        const previous = this.serverConnection
+        this.serverConnection = undefined
+        await previous?.stop().catch(() => undefined)
+        const identity = this.identity
+        if (identity === undefined || this.closed) return
+        this.serverApi?.close()
+        // Device credentials are stored per server origin, so the API must be rebuilt.
+        this.serverApi = new HostServerApi(targetUrl, new ServerCredentialStore(this.identities.directory))
+        this.serverApi.bindIdentity(identity)
+        this.serverApi.setHarnessVersion(this.harnessVersion)
+        if (options.authorizeFallbackAccount === true) {
+          // Auto-authorize this Host on the fallback server with the embedded-server
+          // account when no credentials exist for that origin yet (first failover).
+          const account = this.config.selfHost.account
+          const password = this.config.selfHost.password
+          if (account !== '' && password !== '') {
+            try {
+              if (!(await this.serverApi.hasStoredAuthorization())) {
+                await this.serverApi.authorizeWithAccount(identity, account, password)
+                this.logger.info('authorized Host on the fallback server')
+              }
+            } catch (authorizeError) {
+              this.logger.warn('fallback server authorization failed; log in manually in Remote settings', {
+                message: authorizeError instanceof Error ? authorizeError.message : String(authorizeError),
+              })
+            }
+          }
+        }
+        this.config.serverUrl = targetUrl
+        this.serverConnection = this.createServerConnection(identity)
+        this.serverConnection.start()
+      } catch (error) {
+        this.logger.error('server switch failed', {
+          message: error instanceof Error ? error.message : String(error),
+        })
+      } finally {
+        this.failoverInFlight = false
+      }
+    })()
+  }
+
+  /**
+   * Fail over to `fallbackServerUrl` after the primary server stayed unreachable, then
+   * keep probing the primary so the Host returns to it automatically once it recovers.
+   * Clients authorize per origin, so a failover is never transparent to them.
+   */
+  private switchToFallbackServer(): void {
+    const fallbackUrl = this.config.fallbackServerUrl
+    const primaryUrl = this.config.serverUrl
+    if (fallbackUrl === undefined || primaryUrl === fallbackUrl) return
+    if (this.closed) return
+    this.logger.warn('switching Host connection to the fallback server', {
+      from: primaryUrl ?? '(unset)',
+      to: fallbackUrl,
+    })
+    this.primaryServerUrl = primaryUrl
+    this.switchServer(fallbackUrl, { authorizeFallbackAccount: true })
+    this.startPrimaryRecoveryProbe()
+  }
+
+  private startPrimaryRecoveryProbe(): void {
+    this.stopPrimaryRecoveryProbe()
+    if (this.closed) return
+    const timer = setInterval(() => { void this.probePrimaryServer() }, PRIMARY_RECOVERY_PROBE_MS)
+    // The probe must not keep the Host process alive on its own.
+    timer.unref?.()
+    this.primaryProbe = timer
+  }
+
+  private stopPrimaryRecoveryProbe(): void {
+    if (this.primaryProbe !== undefined) clearInterval(this.primaryProbe)
+    this.primaryProbe = undefined
+    this.primaryProbeHits = 0
+  }
+
+  /** Return to the primary server once it answers again, so a failover does not stick forever. */
+  private async probePrimaryServer(): Promise<void> {
+    const primaryUrl = this.primaryServerUrl
+    if (primaryUrl === undefined || this.closed || this.failoverInFlight) return
+    const probe = new HostServerApi(primaryUrl, new ServerCredentialStore(this.identities.directory))
+    let healthy = false
+    try {
+      healthy = await probe.checkHealth()
+    } finally {
+      probe.close()
+    }
+    if (this.closed || this.primaryServerUrl !== primaryUrl) return
+    if (!healthy) {
+      this.primaryProbeHits = 0
+      return
+    }
+    this.primaryProbeHits += 1
+    if (this.primaryProbeHits < PRIMARY_RECOVERY_CONFIRMATIONS) return
+    this.stopPrimaryRecoveryProbe()
+    this.primaryServerUrl = undefined
+    this.logger.warn('primary server is reachable again; switching the Host back', { to: primaryUrl })
+    this.switchServer(primaryUrl)
   }
 
   private async readHarnessVersion(): Promise<string | undefined> {

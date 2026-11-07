@@ -1,8 +1,8 @@
 {
   "$schema": "https://dsh.community/schemas/dsh-plugin-0.15.json",
-  "id": "com.r2049.ds-harness-remote",
-  "name": "ds-harness-remote",
-  "version": "0.6.2",
+  "id": "com.r2049.dsh-agent-remote",
+  "name": "dsh-agent-remote",
+  "version": "0.6.4-fork.4",
   "manifestVersion": "0.15",
   "facets": {
     "host": {
@@ -36,6 +36,6 @@
   "subscriptions": [],
   "license": "MIT",
   "source": {
-    "repository": "https://github.com/liguobao/ds-harness-remote"
+    "repository": "https://github.com/liguobao/dsh-agent-remote"
   }
 }

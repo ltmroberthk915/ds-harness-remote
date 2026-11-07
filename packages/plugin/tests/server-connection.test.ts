@@ -36,6 +36,43 @@ class FakeWebSocket {
 }
 
 describe('HostServerConnection', () => {
+  it('fails over only after a sustained outage, and announces it once', async () => {
+    vi.useFakeTimers()
+    const onFailover = vi.fn()
+    const authenticate = vi.fn(async () => { throw new ServerApiError('CONNECTION_FAILED', 'unreachable', true) })
+    const hostKeys = generateKeyPair(new Uint8Array(32).fill(53))
+    const server = new HostServerConnection(
+      { ...config(), failoverMinOutageMs: 120_000, reconnect: { enabled: true, initialDelayMs: 1_000, maxDelayMs: 4_000, jitter: 0 } },
+      { schemaVersion: 1, deviceId: 'host-1', name: 'Host', fingerprint: 'HOST', ...hostKeys },
+      { trustedPeer: () => undefined } as unknown as IdentityStore,
+      { baseUrl: 'https://remote.test', authenticate } as unknown as HostServerApi,
+      { close: async () => {} } as unknown as ConnectionController,
+      logger(),
+      () => new FakeWebSocket(),
+      undefined,
+      () => [],
+      undefined,
+      onFailover,
+    )
+    try {
+      server.start()
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(authenticate.mock.calls.length).toBeGreaterThanOrEqual(5)
+      // Remote clients authorize per server origin, so a short blip must never trigger
+      // the switch even though the failure streak is already long enough.
+      expect(onFailover).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(250_000)
+      expect(onFailover).toHaveBeenCalledOnce()
+      await vi.advanceTimersByTimeAsync(600_000)
+      expect(onFailover).toHaveBeenCalledOnce()
+    } finally {
+      try {
+        await server.stop()
+        expect(vi.getTimerCount()).toBe(0)
+      } finally { vi.useRealTimers(); vi.restoreAllMocks() }
+    }
+  })
+
   it('keeps the responder alive for the Server RTC budget and preserves legacy defaults', async () => {
     await runScenarios([
       { name: 'twenty-second Server', timeout: 20000, expected: 20000 },
@@ -1175,6 +1212,8 @@ function config(): ResolvedConfig {
     serverUrl: 'https://dsh.r2049.cn',
     deviceName: 'Host',
     forceRelay: true,
+    iceIpv6: false,
+    selfHost: { enabled: false, port: 8081, account: '', password: '', tunnel: { mode: 'off', token: '' } },
     rotatePinnedPeerKey: false,
     logLevel: 'error',
     reconnect: { enabled: false, initialDelayMs: 100, maxDelayMs: 1_000, jitter: 0 },

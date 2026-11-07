@@ -1,5 +1,31 @@
 # Repository Guide for Agents
 
+## Standby server failover (2026-11-07)
+
+插件包内 `packages/plugin/cordis.patch.yml` 的实例 id 在改名后仍写 `ds-harness-remote`，
+导致 npm 包安装后条目指向不存在的模块：插件卡片显示「启用」但从不激活。现已改为
+`dsh-agent-remote` / `dsh-agent-remote-tui`，并由 `scripts/verify-dsh-plugin.mjs` 断言
+「打包内 patch 必须与包名一致」，同类改名遗漏会在构建期失败。
+
+自部署（`selfHost`）不再顶替 `serverUrl`，只作为备用 origin：主服务器持续不可用时切换到
+`fallbackServerUrl`（未显式配置时取 `selfHost.publicUrl`）。切换门槛为「连续 5 次可重试失败
+且故障已持续 `failoverMinOutageMs`（默认 2 分钟，可用配置或 `DSH_REMOTE_FAILOVER_MIN_OUTAGE_MS`
+覆盖，下限 10 秒）」——Remote 客户端的设备凭据按 origin 存储，抖一下就切会让所有客户端重新授权。
+切换后每分钟探测主服务器 `/health`，连续两次 2xx 即自动切回；原
+API 按 origin 重建（`HostServerApi` + `ServerCredentialStore`），首次切到自建服务器时用
+`selfHost.account/password` 自动为本机注册设备。
+
+Android 侧同步实现：`resolveServerTargets` 按主/备顺序尝试，凭据按 origin 并存；仅有连不上的
+错误才切换（可达服务器上的鉴权失败仍走登录流程）；备用 origin 无凭据时用设置里的备用账号
+注册一次，之后全自动；运行在备用 origin 时会话内每分钟探测主服务器，两次健康后自动切回。
+备用地址默认取构建值（`EXPO_PUBLIC_DSH_REMOTE_FALLBACK_SERVER`，缺省 `https://jtxz.top`），
+设置里清空即关闭切换。
+
+注意：共享包 `dist` 是忽略目录，切换分支后必须先 `pnpm --filter './packages/**' -r build`
+再打包插件 bundle，否则会混入其它分支的协议代码，CI 的「Verify committed Plugin bundles」
+会失败。本轮已验证 plugin check/build、DSH bundle 校验、Android check 与 53 文件 / 485 tests；
+未做真实跨机故障注入、手机端真机切换与长期稳定性验收。
+
 ## werift 0.26.0 upgrade (2026-11-03, Issue #259)
 
 按 #259 清单把 werift 从 0.24.4 升到 0.26.0（plugin 与 apps/vscode 同步升级，消除 hoisted

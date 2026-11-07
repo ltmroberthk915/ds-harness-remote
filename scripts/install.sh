@@ -128,7 +128,7 @@ function abort(message) { const error = new Error(message); error.installerSafe 
   }
   if (autostart === '1') checkOwner();
   if (mode === 'owner') return;
-  const pkgPath = req.resolve('ds-harness-remote/package.json');
+  const pkgPath = req.resolve('dsh-agent-remote/package.json');
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const entry = pkg.exports?.['.']?.import || pkg.main;
   if (typeof entry !== 'string') abort('Remote package has no import entry');
@@ -160,12 +160,12 @@ function abort(message) { const error = new Error(message); error.installerSafe 
     return source.replace(/'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|\s+/g, part => /^\s/.test(part) ? '' : part);
   }
   const stock = "[...ctx.loader.entries()].some(entry => (entry.options.id === 'dsh-tui' || entry.options.name === '@deepseek-harness-tui/dsh-tui') && !entry.disabled )".replace(/\s/g,'');
-  const remotes = entries.filter(e => e.node.name === 'ds-harness-remote' && !e.off);
+  const remotes = entries.filter(e => e.node.name === 'dsh-agent-remote' && !e.off);
   let candidates = remotes.filter(e => !e.uncertain);
   let complementaryPair = false;
   if (!candidates.length && remotes.length === 2) {
-    const ordinary = remotes.find(e => e.node.id === 'ds-harness-remote');
-    const tui = remotes.find(e => e.node.id === 'ds-harness-remote-tui');
+    const ordinary = remotes.find(e => e.node.id === 'dsh-agent-remote');
+    const tui = remotes.find(e => e.node.id === 'dsh-agent-remote-tui');
     if (ordinary && tui && !ordinary.ancestorUncertain && !tui.ancestorUncertain && ordinary.node.disabled instanceof Expression && tui.node.disabled instanceof Expression && normalizeExpression(ordinary.node.disabled.source) === stock && normalizeExpression(tui.node.disabled.source) === '!'+stock && JSON.stringify(ordinary.node.config) === JSON.stringify(tui.node.config)) { candidates = [ordinary]; complementaryPair = true; }
   }
   if (candidates.length !== 1 || (!complementaryPair && remotes.length !== 1)) abort('Remote configuration is missing, ambiguous or dynamically enabled');
@@ -242,8 +242,8 @@ NODE
 run_helper() { "$DSH_COMMAND" plugin --profile "$DSH_PROFILE" exec node -e "$helper" "$DSH_COMMAND" "$DSH_PROFILE" "$1" "$autostart" "$DSH_SYSTEMD_DIR"; }
 # Check service ownership before changing packages, then capabilities before redemption.
 if [[ "$autostart" = 1 ]]; then run_helper owner; fi
-say "Installing ds-harness-remote@${REMOTE_VERSION} into profile ${DSH_PROFILE} using ${DSH_COMMAND}"
-"$DSH_COMMAND" plugin --profile "$DSH_PROFILE" add -w "ds-harness-remote@${REMOTE_VERSION}"
+say "Installing dsh-agent-remote@${REMOTE_VERSION} into profile ${DSH_PROFILE} using ${DSH_COMMAND}"
+"$DSH_COMMAND" plugin --profile "$DSH_PROFILE" add -w "dsh-agent-remote@${REMOTE_VERSION}"
 if [[ "$INTELLIGENT_UI" = 1 ]]; then
   # Same profile as Remote, before any service restart picks up the new bundles.
   say "Installing deepseek-harness-intelligent-ui@${INTELLIGENT_UI_VERSION} into profile ${DSH_PROFILE}"

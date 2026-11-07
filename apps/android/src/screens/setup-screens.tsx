@@ -6,10 +6,12 @@ import { getContentUriAsync } from 'expo-file-system/legacy'
 import * as IntentLauncher from 'expo-intent-launcher'
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Linking, Modal, PixelRatio, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { Toggle } from '../ui/toggle'
-import { BatteryCharging, Bell, BellRing, Cable, Check, ChevronRight, Download, ExternalLink, Fingerprint, FolderPen, Globe, Hash, History, Info, KeyRound, Languages, Laptop, ListCollapse, LockKeyhole, LogOut, Mail, MoreVertical, PanelTop, QrCode as QrCodeIcon, RotateCcw, Route, Settings, ShieldAlert, ShieldCheck, Smartphone, Type, UserRound, X, type LucideIcon } from 'lucide-react-native'
+import { BatteryCharging, Bell, BellRing, Cable, Check, ChevronRight, Download, ExternalLink, Fingerprint, FolderPen, Globe, Hash, History, Info, KeyRound, Languages, Laptop, ListCollapse, LockKeyhole, LogOut, Mail, MoreVertical, PanelTop, QrCode as QrCodeIcon, RotateCcw, Route, Settings, ShieldAlert, ShieldCheck, Signal, Smartphone, Type, UserRound, X, type LucideIcon } from 'lucide-react-native'
 import { useAppStore } from '../state/store'
 import type { QrLoginStart } from '../state/store-state'
 import { SOURCE_CODE_URL } from '../lib/links'
+import { DEFAULT_FALLBACK_SERVER_URL } from '../lib/defaults'
+import { standbyServerUrl } from '../services/server-failover'
 import { foregroundService } from '../services/foreground-service'
 import type { OAuthProviderInfo } from '../services/api'
 import { BlurHeaderFrame, Button, Field, GroupCard, GroupRow, IconButton, KeyValue, Screen, SectionTitle, TopBar } from '../ui/components'
@@ -597,6 +599,10 @@ export function SettingsScreen({ onBack, onReset }: { onBack: () => void; onRese
   const comfort = useBrowseMemory()
   const preference = useAppStore(state => state.transportPreference)
   const setPreference = useAppStore(state => state.setTransportPreference)
+  const connectionTimings = useAppStore(state => state.connectionTimings)
+  const cellularSkipP2p = useAppStore(state => state.cellularSkipP2p)
+  const setCellularSkipP2p = useAppStore(state => state.setCellularSkipP2p)
+  const [cellularSkipSaving, setCellularSkipSaving] = useState(false)
   const languagePreference = useAppStore(state => state.languagePreference)
   const setLanguagePreference = useAppStore(state => state.setLanguagePreference)
   const [languagePickerOpen, setLanguagePickerOpen] = useState(false)
@@ -617,6 +623,31 @@ export function SettingsScreen({ onBack, onReset }: { onBack: () => void; onRese
   const defaultPermission = useAppStore(state => state.defaultPermissionPreset)
   const setDefaultPermission = useAppStore(state => state.setDefaultPermissionPreset)
   const [permissionSaving, setPermissionSaving] = useState(false)
+  const activeServerUrl = useAppStore(state => state.activeServerUrl)
+  const serverFailover = useAppStore(state => state.serverFailover === true)
+  const standbyUrl = standbyServerUrl(config ?? { baseUrl: '' })
+  const saveFallbackServer = useAppStore(state => state.saveFallbackServer)
+  const [fallbackUrlDraft, setFallbackUrlDraft] = useState(config?.fallbackBaseUrl ?? DEFAULT_FALLBACK_SERVER_URL)
+  const [fallbackAccountDraft, setFallbackAccountDraft] = useState(config?.fallbackAccount ?? '')
+  const [fallbackPasswordDraft, setFallbackPasswordDraft] = useState(config?.fallbackPassword ?? '')
+  const [fallbackSaving, setFallbackSaving] = useState(false)
+  useEffect(() => {
+    setFallbackUrlDraft(config?.fallbackBaseUrl ?? DEFAULT_FALLBACK_SERVER_URL)
+    setFallbackAccountDraft(config?.fallbackAccount ?? '')
+    setFallbackPasswordDraft(config?.fallbackPassword ?? '')
+  }, [config?.fallbackBaseUrl, config?.fallbackAccount, config?.fallbackPassword])
+  const saveFallback = async () => {
+    setFallbackSaving(true)
+    try {
+      await saveFallbackServer({
+        fallbackBaseUrl: fallbackUrlDraft,
+        fallbackAccount: fallbackAccountDraft,
+        fallbackPassword: fallbackPasswordDraft,
+      })
+    } finally {
+      setFallbackSaving(false)
+    }
+  }
   const reset = useAppStore(state => state.resetLocalData)
   const signOut = useAppStore(state => state.signOut)
   const { colors } = useTheme()
@@ -643,6 +674,14 @@ export function SettingsScreen({ onBack, onReset }: { onBack: () => void; onRese
     try { await setCompactHistory(value) }
     catch { Alert.alert(zhCN.settings.compactHistorySaveFailed, zhCN.settings.statusBarSaveFailedBody) }
     finally { setCompactSaving(false) }
+  }
+
+  const toggleCellularSkipP2p = async (value: boolean) => {
+    if (cellularSkipSaving) return
+    setCellularSkipSaving(true)
+    try { await setCellularSkipP2p(value) }
+    catch { Alert.alert(zhCN.settings.cellularSkipP2p, zhCN.settings.statusBarSaveFailedBody) }
+    finally { setCellularSkipSaving(false) }
   }
 
   const toggleTypographyDensity = async (value: TypographyDensity) => {
@@ -838,10 +877,56 @@ export function SettingsScreen({ onBack, onReset }: { onBack: () => void; onRese
             <SectionTitle>{zhCN.settings.connection}</SectionTitle>
             <GroupCard>
               <GroupRow first icon={Globe} label={zhCN.settings.server} value={config?.baseUrl?.replace(/^https?:\/\//, '') ?? zhCN.settings.notConfigured} />
+              {standbyUrl === undefined ? undefined : (
+                <GroupRow
+                  icon={Signal}
+                  label={zhCN.settings.fallbackServer}
+                  value={`${standbyUrl.replace(/^https?:\/\//, '')}${serverFailover ? ` · ${zhCN.settings.fallbackBadge}` : ''}`}
+                />
+              )}
+              {activeServerUrl === undefined ? undefined : (
+                <GroupRow
+                  icon={Cable}
+                  label={zhCN.settings.activeServer}
+                  value={`${activeServerUrl.replace(/^https?:\/\//, '')}${serverFailover ? ` · ${zhCN.settings.fallbackBadge}` : ''}`}
+                />
+              )}
               <GroupRow icon={UserRound} label={zhCN.settings.account} value={account ?? zhCN.settings.notSignedIn} />
               <GroupRow icon={KeyRound} label={zhCN.settings.loginMethod} value={loginMethodLabel(config?.loginMethod)} />
               <GroupRow icon={Cable} label={zhCN.settings.protocol} value="DSH Remote v1" />
             </GroupCard>
+
+            <SectionTitle>{zhCN.settings.fallbackServer}</SectionTitle>
+            <GroupCard>
+              <View style={styles.emailForm}>
+                <Field
+                  label={zhCN.settings.fallbackServer}
+                  value={fallbackUrlDraft}
+                  onChangeText={setFallbackUrlDraft}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  placeholder="https://"
+                />
+                <Field
+                  label={zhCN.settings.fallbackAccount}
+                  value={fallbackAccountDraft}
+                  onChangeText={setFallbackAccountDraft}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <Field
+                  label={zhCN.settings.fallbackPassword}
+                  value={fallbackPasswordDraft}
+                  onChangeText={setFallbackPasswordDraft}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <Button label={zhCN.settings.saveFallback} onPress={() => void saveFallback()} loading={fallbackSaving} />
+              </View>
+            </GroupCard>
+            <Text style={styles.preferenceNote}>{zhCN.settings.fallbackNote}</Text>
 
             <SectionTitle>{zhCN.settings.transport}</SectionTitle>
             <GroupCard>
@@ -864,6 +949,21 @@ export function SettingsScreen({ onBack, onReset }: { onBack: () => void; onRese
               })}
             </GroupCard>
             <Text style={styles.preferenceNote}>{zhCN.settings.transportNote}</Text>
+            <GroupCard style={styles.settingsGap}>
+              <GroupRow
+                first
+                icon={Signal}
+                label={zhCN.settings.cellularSkipP2p}
+                detail={zhCN.settings.cellularSkipP2pDetail}
+                accessory={<Toggle accessibilityLabel={zhCN.settings.cellularSkipP2p} value={cellularSkipP2p} disabled={cellularSkipSaving}
+                  onValueChange={value => void toggleCellularSkipP2p(value)} {...switchColors} />}
+              />
+            </GroupCard>
+            {connectionTimings !== undefined && (
+              <Text style={styles.preferenceNote}>
+                {`connect ${(connectionTimings.total / 1000).toFixed(1)}s · auth ${(connectionTimings.auth / 1000).toFixed(1)}s · transport ${(connectionTimings.transport / 1000).toFixed(1)}s · host ${(connectionTimings.describe / 1000).toFixed(1)}s`}
+              </Text>
+            )}
 
             <SectionTitle>{zhCN.settings.identity}</SectionTitle>
             <GroupCard>
