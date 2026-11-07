@@ -74608,6 +74608,7 @@ var entryConfigSchema = s.object({
   role: s.union(["host", "client", "both"]),
   serverUrl: s.string(),
   fallbackServerUrl: s.string(),
+  failoverMinOutageMs: s.number(),
   deviceName: s.string(),
   terminal: s.object({ enabled: s.boolean() }),
   remoteTools: s.object({ enabled: s.boolean() }),
@@ -74665,6 +74666,7 @@ var configSchema = external_exports.object({
   role: external_exports.enum(["host", "client", "both"]).optional(),
   serverUrl: external_exports.string().url().optional(),
   fallbackServerUrl: external_exports.string().url().optional(),
+  failoverMinOutageMs: external_exports.number().int().min(1e4).max(36e5).optional(),
   deviceName: external_exports.string().trim().min(1).max(80).optional(),
   terminal: external_exports.object({ enabled: external_exports.boolean().optional() }).strict().optional(),
   remoteTools: external_exports.object({ enabled: external_exports.boolean().optional() }).strict().optional(),
@@ -74713,6 +74715,11 @@ function resolveConfig(input4 = {}, env = process.env) {
   const configuredFallbackServerUrl = parsed.fallbackServerUrl ?? env.DSH_REMOTE_FALLBACK_SERVER;
   const serverUrl = configuredServerUrl === void 0 ? void 0 : normalizeServerUrl(configuredServerUrl);
   const fallbackServerUrl = configuredFallbackServerUrl === void 0 ? void 0 : normalizeServerUrl(configuredFallbackServerUrl);
+  const configuredFailoverMinOutageMs = parsed.failoverMinOutageMs ?? (env.DSH_REMOTE_FAILOVER_MIN_OUTAGE_MS === void 0 ? void 0 : Number(env.DSH_REMOTE_FAILOVER_MIN_OUTAGE_MS));
+  const failoverMinOutageMs = configuredFailoverMinOutageMs ?? 12e4;
+  if (!Number.isFinite(failoverMinOutageMs) || failoverMinOutageMs < 1e4) {
+    throw new TypeError("failoverMinOutageMs must be a number of at least 10000 milliseconds");
+  }
   const initialDelayMs = reconnect.initialDelayMs ?? 4e3;
   const maxDelayMs = reconnect.maxDelayMs ?? 3e4;
   if (maxDelayMs < initialDelayMs) {
@@ -74723,6 +74730,7 @@ function resolveConfig(input4 = {}, env = process.env) {
     role: parsed.role ?? "host",
     ...serverUrl === void 0 ? {} : { serverUrl },
     ...fallbackServerUrl === void 0 ? {} : { fallbackServerUrl },
+    failoverMinOutageMs,
     deviceName: parsed.deviceName ?? env.DSH_REMOTE_DEVICE_NAME ?? hostname3(),
     hostControl: { enabled: parsed.hostControl?.enabled ?? true },
     terminal: { enabled: parsed.terminal?.enabled ?? (env.DSH_REMOTE_TERMINAL_ENABLED === void 0 || env.DSH_REMOTE_TERMINAL_ENABLED === "true") },
@@ -74808,7 +74816,7 @@ function normalizeServerUrl(value) {
 }
 
 // src/version.ts
-var PLUGIN_VERSION = "0.6.4-fork.3";
+var PLUGIN_VERSION = "0.6.4-fork.4";
 
 // src/server-api.ts
 var TERMINAL_CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/u;
@@ -86969,7 +86977,7 @@ function isOversizedListing(value) {
 // src/server-connection.ts
 var DEFAULT_WEBRTC_NEGOTIATE_TIMEOUT_MS = 12e3;
 var FAILOVER_MIN_FAILURES = 5;
-var FAILOVER_MIN_OUTAGE_MS = 5 * 6e4;
+var DEFAULT_FAILOVER_MIN_OUTAGE_MS = 2 * 6e4;
 var HostServerConnection = class {
   constructor(config2, identity3, identities, api, connections, logger2, createWebSocket = (url2) => new WebSocket(url2), rtcFactoryProvider, hostCapabilities = () => [], harnessVersion, onFailover) {
     this.config = config2;
@@ -87103,7 +87111,8 @@ var HostServerConnection = class {
         if (!this.config.reconnect.enabled) return;
         this.consecutiveFailures += 1;
         this.failingSince ??= Date.now();
-        if (this.consecutiveFailures >= FAILOVER_MIN_FAILURES && Date.now() - this.failingSince >= FAILOVER_MIN_OUTAGE_MS && !this.failoverRequested && this.onFailover !== void 0) {
+        const minOutageMs = this.config.failoverMinOutageMs ?? DEFAULT_FAILOVER_MIN_OUTAGE_MS;
+        if (this.consecutiveFailures >= FAILOVER_MIN_FAILURES && Date.now() - this.failingSince >= minOutageMs && !this.failoverRequested && this.onFailover !== void 0) {
           this.failoverRequested = true;
           this.logger.warn("primary server kept failing; switching to the fallback server");
           try {

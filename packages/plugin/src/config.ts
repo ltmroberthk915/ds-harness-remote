@@ -11,6 +11,13 @@ export interface Config {
   serverUrl?: string
   /** Same-origin fallback server used when the primary server keeps failing. */
   fallbackServerUrl?: string
+  /**
+   * Continuous primary-server outage required before failing over to
+   * `fallbackServerUrl`. Defaults to 120000 (2 minutes): Remote clients keep
+   * their device credentials per origin, so a shorter window risks flapping
+   * between origins on ordinary network blips.
+   */
+  failoverMinOutageMs?: number
   deviceName?: string
   terminal?: { enabled?: boolean }
   remoteTools?: { enabled?: boolean }
@@ -74,6 +81,8 @@ export interface ResolvedConfig {
   serverUrl?: string
   /** Same-origin fallback server used when the primary server keeps failing. */
   fallbackServerUrl?: string
+  /** Sustained primary outage that permits the failover (see `Config.failoverMinOutageMs`). */
+  failoverMinOutageMs?: number
   deviceName: string
   forceRelay: boolean
   /** Offer IPv6 host candidates for WebRTC (direct path for dual-stack peers). */
@@ -137,6 +146,7 @@ const entryConfigSchema = s.object({
   role: s.union(['host', 'client', 'both'] as const),
   serverUrl: s.string(),
   fallbackServerUrl: s.string(),
+  failoverMinOutageMs: s.number(),
   deviceName: s.string(),
   terminal: s.object({ enabled: s.boolean() }),
   remoteTools: s.object({ enabled: s.boolean() }),
@@ -206,6 +216,7 @@ const configSchema = z.object({
   role: z.enum(['host', 'client', 'both']).optional(),
   serverUrl: z.string().url().optional(),
   fallbackServerUrl: z.string().url().optional(),
+  failoverMinOutageMs: z.number().int().min(10_000).max(3_600_000).optional(),
   deviceName: z.string().trim().min(1).max(80).optional(),
   terminal: z.object({ enabled: z.boolean().optional() }).strict().optional(),
   remoteTools: z.object({ enabled: z.boolean().optional() }).strict().optional(),
@@ -258,6 +269,12 @@ export function resolveConfig(input: ConfigInput = {}, env: NodeJS.ProcessEnv = 
   const configuredFallbackServerUrl = parsed.fallbackServerUrl ?? env.DSH_REMOTE_FALLBACK_SERVER
   const serverUrl = configuredServerUrl === undefined ? undefined : normalizeServerUrl(configuredServerUrl)
   const fallbackServerUrl = configuredFallbackServerUrl === undefined ? undefined : normalizeServerUrl(configuredFallbackServerUrl)
+  const configuredFailoverMinOutageMs = parsed.failoverMinOutageMs
+    ?? (env.DSH_REMOTE_FAILOVER_MIN_OUTAGE_MS === undefined ? undefined : Number(env.DSH_REMOTE_FAILOVER_MIN_OUTAGE_MS))
+  const failoverMinOutageMs = configuredFailoverMinOutageMs ?? 120_000
+  if (!Number.isFinite(failoverMinOutageMs) || failoverMinOutageMs < 10_000) {
+    throw new TypeError('failoverMinOutageMs must be a number of at least 10000 milliseconds')
+  }
   const initialDelayMs = reconnect.initialDelayMs ?? 4_000
   const maxDelayMs = reconnect.maxDelayMs ?? 30_000
   if (maxDelayMs < initialDelayMs) {
@@ -268,6 +285,7 @@ export function resolveConfig(input: ConfigInput = {}, env: NodeJS.ProcessEnv = 
     role: parsed.role ?? 'host',
     ...(serverUrl === undefined ? {} : { serverUrl }),
     ...(fallbackServerUrl === undefined ? {} : { fallbackServerUrl }),
+    failoverMinOutageMs,
     deviceName: parsed.deviceName ?? env.DSH_REMOTE_DEVICE_NAME ?? hostname(),
     hostControl: { enabled: parsed.hostControl?.enabled ?? true },
     terminal: { enabled: parsed.terminal?.enabled ?? (env.DSH_REMOTE_TERMINAL_ENABLED === undefined || env.DSH_REMOTE_TERMINAL_ENABLED === 'true') },

@@ -9,8 +9,9 @@
 
 自部署（`selfHost`）不再顶替 `serverUrl`，只作为备用 origin：主服务器持续不可用时切换到
 `fallbackServerUrl`（未显式配置时取 `selfHost.publicUrl`）。切换门槛为「连续 5 次可重试失败
-且故障已持续 5 分钟」——Remote 客户端的设备凭据按 origin 存储，短暂抖动若触发切换会迫使
-所有客户端重新授权。切换后每分钟探测主服务器 `/health`，连续两次 2xx 即自动切回；原
+且故障已持续 `failoverMinOutageMs`（默认 2 分钟，可用配置或 `DSH_REMOTE_FAILOVER_MIN_OUTAGE_MS`
+覆盖，下限 10 秒）」——Remote 客户端的设备凭据按 origin 存储，抖一下就切会让所有客户端重新授权。
+切换后每分钟探测主服务器 `/health`，连续两次 2xx 即自动切回；原
 API 按 origin 重建（`HostServerApi` + `ServerCredentialStore`），首次切到自建服务器时用
 `selfHost.account/password` 自动为本机注册设备。
 

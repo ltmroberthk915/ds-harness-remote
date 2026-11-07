@@ -93,9 +93,10 @@ const FAILOVER_MIN_FAILURES = 5
 /**
  * A failover moves the Host to another origin, and Remote clients keep their device
  * credentials per origin, so a short blip must self-heal instead of triggering a
- * switch that would force every client to authorize again. Require a sustained outage.
+ * switch that would force every client to authorize again. Require a sustained
+ * outage; `config.failoverMinOutageMs` overrides this default.
  */
-const FAILOVER_MIN_OUTAGE_MS = 5 * 60_000
+const DEFAULT_FAILOVER_MIN_OUTAGE_MS = 2 * 60_000
 
 export class HostServerConnection {
   private socket?: WebSocketLike
@@ -230,9 +231,10 @@ export class HostServerConnection {
         if (!this.config.reconnect.enabled) return
         this.consecutiveFailures += 1
         this.failingSince ??= Date.now()
+        const minOutageMs = this.config.failoverMinOutageMs ?? DEFAULT_FAILOVER_MIN_OUTAGE_MS
         if (
           this.consecutiveFailures >= FAILOVER_MIN_FAILURES
-          && Date.now() - this.failingSince >= FAILOVER_MIN_OUTAGE_MS
+          && Date.now() - this.failingSince >= minOutageMs
           && !this.failoverRequested
           && this.onFailover !== undefined
         ) {

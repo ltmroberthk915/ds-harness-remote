@@ -35,8 +35,16 @@ describe('plugin config', () => {
     expect(() => resolveConfig({ codex: { enabled: true, allowedRoots: ['/workspace'] } } as never)).toThrow()
   })
 
-  it('preserves independent ACP launch options and scopes legacy Cursor configuration to Cursor', () => {
-    const legacy = resolveConfig({ cursor: { enabled: true, binary: '/custom/cursor' } }, {})
+  it('requires a sustained outage before failing over, with a two-minute default', () => {
+    expect(resolveConfig({}, {}).failoverMinOutageMs).toBe(120_000)
+    expect(resolveConfig({ failoverMinOutageMs: 30_000 }, {}).failoverMinOutageMs).toBe(30_000)
+    expect(resolveConfig({}, { DSH_REMOTE_FAILOVER_MIN_OUTAGE_MS: '45000' }).failoverMinOutageMs).toBe(45_000)
+    // Below ten seconds a flapping server would move every client to another origin.
+    expect(() => resolveConfig({ failoverMinOutageMs: 5_000 } as never, {})).toThrow()
+    expect(() => resolveConfig({}, { DSH_REMOTE_FAILOVER_MIN_OUTAGE_MS: 'soon' })).toThrow(/failoverMinOutageMs/)
+  })
+
+  it('preserves independent ACP launch options and scopes legacy Cursor configuration to Cursor', () => {    const legacy = resolveConfig({ cursor: { enabled: true, binary: '/custom/cursor' } }, {})
     expect(legacy.acp?.backends.find(item => item.id === 'cursor')).toMatchObject({ enabled: true, command: '/custom/cursor' })
     expect(legacy.acp?.backends.find(item => item.id === 'antigravity')?.enabled).toBe(false)
     const config = resolveConfig({ acp: { enabled: false, backends: [

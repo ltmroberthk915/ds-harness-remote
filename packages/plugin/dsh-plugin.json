@@ -2,7 +2,7 @@
   "$schema": "https://dsh.community/schemas/dsh-plugin-0.15.json",
   "id": "com.r2049.dsh-agent-remote",
   "name": "dsh-agent-remote",
-  "version": "0.6.4-fork.3",
+  "version": "0.6.4-fork.4",
   "manifestVersion": "0.15",
   "facets": {
     "host": {

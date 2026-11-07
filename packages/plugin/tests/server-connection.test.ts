@@ -42,7 +42,7 @@ describe('HostServerConnection', () => {
     const authenticate = vi.fn(async () => { throw new ServerApiError('CONNECTION_FAILED', 'unreachable', true) })
     const hostKeys = generateKeyPair(new Uint8Array(32).fill(53))
     const server = new HostServerConnection(
-      { ...config(), reconnect: { enabled: true, initialDelayMs: 1_000, maxDelayMs: 4_000, jitter: 0 } },
+      { ...config(), failoverMinOutageMs: 120_000, reconnect: { enabled: true, initialDelayMs: 1_000, maxDelayMs: 4_000, jitter: 0 } },
       { schemaVersion: 1, deviceId: 'host-1', name: 'Host', fingerprint: 'HOST', ...hostKeys },
       { trustedPeer: () => undefined } as unknown as IdentityStore,
       { baseUrl: 'https://remote.test', authenticate } as unknown as HostServerApi,
